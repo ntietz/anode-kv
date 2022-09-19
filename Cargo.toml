@@ -5,7 +5,18 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[profile.bench]
+opt-level = 3
+
 [dependencies]
 
 # error tracking is cool
 thiserror = "1.0.35"
+
+[dev-dependencies]
+
+criterion = "0.4.0"
+
+[[bench]]
+name = "kv_benchmark"
+harness = false
