@@ -13,6 +13,21 @@ opt-level = 3
 # error tracking is cool
 thiserror = "1.0.35"
 
+# i like loggers, i hate lagers
+log = "0.4.17"
+env_logger = "0.9.1"
+
+# starting this out async
+# - enable "full" to get all the things, TODO slim this down later!
+# - enable "tracing" to support use of tokio-console
+tokio = { version = "1.21.1", features = ["full", "tracing"] }
+
+# emit events to use with tokio-console
+console-subscriber = "0.1.8"
+
+# handy for reading contiguous streams of... bytes.
+bytes = "1.2.1"
+
 [dev-dependencies]
 
 criterion = "0.4.0"

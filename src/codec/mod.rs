@@ -10,7 +10,7 @@ pub enum Atom {
     Integer(i64),
     Error(String),
     BulkString(Option<Vec<u8>>),
-    Array(Vec<Atom>),
+    Array(i64),
 }
 
 #[derive(Error, Debug)]
@@ -92,15 +92,11 @@ pub fn encode<W: Write>(w: &mut W, atom: &Atom) -> Result<(), WriteError> {
             w.write_all(&buf[..]).map_err(WriteError::Failed)?;
             Ok(())
         }
-        Atom::Array(elems) => {
+        Atom::Array(count) => {
             buf.push(b'*');
-            buf.extend(format!("{}", elems.len()).bytes());
+            buf.extend(format!("{}", count).bytes());
             buf.extend(CRLF.bytes());
             w.write_all(&buf[..]).map_err(WriteError::Failed)?;
-
-            for elem in elems {
-                encode(w, elem)?;
-            }
             Ok(())
         }
     }
@@ -132,11 +128,7 @@ pub fn decode<T: Read>(s: &mut T) -> Result<Atom, ReadError> {
         }
         b'*' => {
             let length = read_integer(s)?;
-            let mut elems: Vec<Atom> = vec![];
-            for _ in 0..length {
-                elems.push(decode(s)?);
-            }
-            Ok(Atom::Array(elems))
+            Ok(Atom::Array(length))
         }
         _ => Err(ReadError::NotImplemented),
     }
@@ -308,11 +300,12 @@ mod tests {
     #[test]
     fn decodes_arrays() {
         let encoded = "*3\r\n+hello\r\n+world\r\n:1\r\n";
-        let expected = Atom::Array(vec![
+        let expected = Atom::Array(3);
+        /*vec![
             Atom::SimpleString("hello".to_string()),
             Atom::SimpleString("world".to_string()),
             Atom::Integer(1),
-        ]);
+        ]);*/
 
         let mut encoded_stream = encoded.as_bytes();
         let decoded = decode(&mut encoded_stream);
