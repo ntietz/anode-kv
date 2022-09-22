@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-use crate::codec::{decode, encode, Atom};
+use crate::codec::{decode, encode, Atom, CRLF};
 
 pub async fn accept_connection(mut socket: TcpStream, addr: SocketAddr) -> std::io::Result<()> {
     log::info!("Accepting connection from {}", addr);
@@ -25,10 +25,13 @@ pub async fn accept_connection(mut socket: TcpStream, addr: SocketAddr) -> std::
                 buffer.advance(pos);
 
                 if buffer.is_empty() {
-                    let resp = Atom::Error("Not implemented yet".to_string());
+                    let resp = Atom::Error("ERR not implemented yet".to_string());
                     let mut write_buf: Vec<u8> = vec![];
-                    encode(&mut write_buf, &resp); // TODO: handle error
+                    encode(&mut write_buf, &resp)
+                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?; // TODO: handle error
+                    println!("{:?}", write_buf);
 
+                    write_buf.extend(CRLF.bytes());
                     socket.write_all(&write_buf).await?;
                 }
             } else {
