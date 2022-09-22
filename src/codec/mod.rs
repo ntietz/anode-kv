@@ -300,17 +300,21 @@ mod tests {
     #[test]
     fn decodes_arrays() {
         let encoded = "*3\r\n+hello\r\n+world\r\n:1\r\n";
-        let expected = Atom::Array(3);
-        /*vec![
+        let expected_tokens = vec![
+            Atom::Array(3),
             Atom::SimpleString("hello".to_string()),
             Atom::SimpleString("world".to_string()),
             Atom::Integer(1),
-        ]);*/
+        ];
 
-        let mut encoded_stream = encoded.as_bytes();
-        let decoded = decode(&mut encoded_stream);
-        assert!(decoded.is_ok());
-        assert_eq!(expected, decoded.unwrap());
+        let encoded_stream = encoded.as_bytes();
+        let mut cursor = std::io::Cursor::new(encoded_stream);
+
+        for expected_token in expected_tokens {
+            let decoded = decode(&mut cursor);
+            assert!(decoded.is_ok());
+            assert_eq!(expected_token, decoded.unwrap());
+        }
     }
 
     #[test]
@@ -322,7 +326,10 @@ mod tests {
             "$5\r\nhello\r\n",
             "$0\r\n\r\n",
             "$-1\r\n",
-            "*3\r\n+hello\r\n+world\r\n:1\r\n",
+            "*3\r\n",
+            "+hello\r\n",
+            "+world\r\n",
+            ":1\r\n",
         ];
 
         for message in &messages {
@@ -335,7 +342,7 @@ mod tests {
             let encoded = encode(&mut buf, &decoded.unwrap());
 
             assert!(encoded.is_ok());
-            assert_eq!(message.bytes().collect::<Vec<u8>>(), buf);
+            assert_eq!(message.bytes().collect::<Vec<u8>>(), buf); // TODO: fix
         }
     }
 
