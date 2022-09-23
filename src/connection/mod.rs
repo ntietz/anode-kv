@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-use crate::codec::{decode, encode, Atom, CRLF};
+use crate::codec::{decode, encode, Atom};
 
 pub async fn accept_connection(mut socket: TcpStream, addr: SocketAddr) -> std::io::Result<()> {
     log::info!("Accepting connection from {}", addr);
