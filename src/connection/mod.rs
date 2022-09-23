@@ -31,7 +31,6 @@ pub async fn accept_connection(mut socket: TcpStream, addr: SocketAddr) -> std::
                         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?; // TODO: handle error
                     println!("{:?}", write_buf);
 
-                    write_buf.extend(CRLF.bytes());
                     socket.write_all(&write_buf).await?;
                 }
             } else {
