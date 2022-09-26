@@ -38,14 +38,14 @@ async fn connect_and_request(addr: String) -> TcpStream {
         .await
         .expect("failed to connect to server");
 
-    let command_string = b"$7\r\nCOMMAND\r\n";
+    let command_string = b"*2\r\n+ECHO\r\n+hello world\r\n";
 
     stream
         .write_all(command_string)
         .await
         .expect("failed write into stream");
 
-    let expected_response = b"-ERR not implemented yet\r\n";
+    let expected_response = b"$11\r\nhello world\r\n";
     let mut buffer = vec![0; expected_response.len()];
 
     let stream_read_promise = stream.read_exact(&mut buffer[..]);
