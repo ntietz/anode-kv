@@ -58,6 +58,12 @@ impl Command {
                 };
                 Ok((Command::Echo(reply_token), 3))
             }
+            _ if cmd == "COMMAND" => {
+                if length != 1 {
+                    return Err(CommandError::Malformed);
+                }
+                Ok((Command::Command, 2))
+            }
             unk => Err(CommandError::UnknownCommand(unk.to_string())),
         }
     }
