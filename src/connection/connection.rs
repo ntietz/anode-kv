@@ -5,6 +5,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 use crate::codec::{decode, encode, Token};
+use crate::command::{Command, CommandProcessor};
 
 pub type ConnectionId = u64;
 
@@ -23,10 +24,13 @@ impl Connection {
         log::info!("(id={}) accepting connection from {}", self.id, self.addr);
 
         let mut buffer = BytesMut::with_capacity(4 * 1024);
+        let cp = CommandProcessor {}; // TODO: this should probably be shared? or we send via a
+                                      // queue?
+
+        let mut tokens: Vec<Token> = vec![];
 
         loop {
             if 0 == self.socket.read_buf(&mut buffer).await? {
-                println!("done");
                 break;
             }
 
@@ -34,23 +38,28 @@ impl Connection {
                 let mut cursor = Cursor::new(&buffer[..]);
                 if let Ok(token) = decode(&mut cursor) {
                     let pos = cursor.position() as usize;
-                    println!("pos: {}, token: {:?}, buf: {:?}", pos, token, buffer);
                     buffer.advance(pos);
+                    tokens.push(token);
 
                     if buffer.is_empty() {
-                        let resp = Token::Error("ERR not implemented yet".to_string());
-                        let mut write_buf: Vec<u8> = vec![];
-                        encode(&mut write_buf, &resp)
-                            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?; // TODO: handle error
-                        println!("{:?}", write_buf);
+                        let (command, consumed) = Command::from_tokens(&tokens)
+                            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                        if consumed < tokens.len() {
+                            tokens = tokens.split_off(consumed);
+                        }
 
-                        self.socket.write_all(&write_buf).await?;
+                        let resp = cp.execute_command(&command);
+                        for token in resp {
+                            let mut write_buf: Vec<u8> = vec![];
+                            encode(&mut write_buf, &token)
+                                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?; // TODO: handle error
+
+                            self.socket.write_all(&write_buf).await?;
+                        }
                     }
                 } else {
                     break;
                 }
-
-                println!("buf: {:?}", buffer);
             }
         }
 

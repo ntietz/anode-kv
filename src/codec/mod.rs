@@ -4,7 +4,7 @@ use thiserror::Error;
 
 pub const CRLF: &str = "\r\n";
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Token {
     SimpleString(String),
     Integer(i64),
