@@ -4,6 +4,7 @@ use anode_kv::server::launch;
 async fn main() -> std::io::Result<()> {
     env_logger::init();
     let addr = "127.0.0.1:11311";
-    launch(addr).await?;
+    let (_addr, handle) = launch(addr).await?;
+    handle.await.expect("should shut down gracefully");
     Ok(())
 }
