@@ -5,7 +5,7 @@ use thiserror::Error;
 pub const CRLF: &str = "\r\n";
 
 #[derive(Debug, PartialEq)]
-pub enum Atom {
+pub enum Token {
     SimpleString(String),
     Integer(i64),
     Error(String),
@@ -46,11 +46,11 @@ pub enum WriteError {
     Failed(std::io::Error),
 }
 
-/// encode takes in a Write and an Atom and encodes it.
-pub fn encode<W: Write>(w: &mut W, atom: &Atom) -> Result<(), WriteError> {
+/// encode takes in a Write and an Token and encodes it.
+pub fn encode<W: Write>(w: &mut W, token: &Token) -> Result<(), WriteError> {
     let mut buf: Vec<u8> = vec![];
-    match atom {
-        Atom::SimpleString(s) => {
+    match token {
+        Token::SimpleString(s) => {
             buf.push(b'+');
             buf.extend(s.bytes());
             buf.extend(CRLF.bytes());
@@ -58,7 +58,7 @@ pub fn encode<W: Write>(w: &mut W, atom: &Atom) -> Result<(), WriteError> {
             w.write_all(&buf[..]).map_err(WriteError::Failed)?;
             Ok(())
         }
-        Atom::Error(s) => {
+        Token::Error(s) => {
             buf.push(b'-');
             buf.extend(s.bytes());
             buf.extend(CRLF.bytes());
@@ -66,7 +66,7 @@ pub fn encode<W: Write>(w: &mut W, atom: &Atom) -> Result<(), WriteError> {
             w.write_all(&buf[..]).map_err(WriteError::Failed)?;
             Ok(())
         }
-        Atom::Integer(v) => {
+        Token::Integer(v) => {
             buf.push(b':');
             buf.extend(format!("{}", v).bytes());
             buf.extend(CRLF.bytes());
@@ -74,7 +74,7 @@ pub fn encode<W: Write>(w: &mut W, atom: &Atom) -> Result<(), WriteError> {
             w.write_all(&buf[..]).map_err(WriteError::Failed)?;
             Ok(())
         }
-        Atom::BulkString(s) => {
+        Token::BulkString(s) => {
             buf.push(b'$');
             match s {
                 Some(s) => {
@@ -92,7 +92,7 @@ pub fn encode<W: Write>(w: &mut W, atom: &Atom) -> Result<(), WriteError> {
             w.write_all(&buf[..]).map_err(WriteError::Failed)?;
             Ok(())
         }
-        Atom::Array(count) => {
+        Token::Array(count) => {
             buf.push(b'*');
             buf.extend(format!("{}", count).bytes());
             buf.extend(CRLF.bytes());
@@ -104,7 +104,7 @@ pub fn encode<W: Write>(w: &mut W, atom: &Atom) -> Result<(), WriteError> {
 
 /// decode takes in a Read and returns the first complete message which it
 /// can decode, or an error if the stream is empty or otherwise malformed.
-pub fn decode<T: Read>(s: &mut T) -> Result<Atom, ReadError> {
+pub fn decode<T: Read>(s: &mut T) -> Result<Token, ReadError> {
     let mut buf: [u8; 1] = [0];
 
     s.read_exact(&mut buf)
@@ -112,15 +112,15 @@ pub fn decode<T: Read>(s: &mut T) -> Result<Atom, ReadError> {
     let tag = buf[0];
 
     match tag {
-        b':' => Ok(Atom::Integer(read_integer(s)?)),
-        b'+' => Ok(Atom::SimpleString(read_simple_string(s)?)),
-        b'-' => Ok(Atom::Error(read_simple_string(s)?)),
+        b':' => Ok(Token::Integer(read_integer(s)?)),
+        b'+' => Ok(Token::SimpleString(read_simple_string(s)?)),
+        b'-' => Ok(Token::Error(read_simple_string(s)?)),
         b'$' => {
             let length = read_integer(s)?;
             if length < 0 {
-                Ok(Atom::BulkString(None))
+                Ok(Token::BulkString(None))
             } else {
-                Ok(Atom::BulkString(Some(read_bulk_string(
+                Ok(Token::BulkString(Some(read_bulk_string(
                     s,
                     length as usize,
                 )?)))
@@ -128,7 +128,7 @@ pub fn decode<T: Read>(s: &mut T) -> Result<Atom, ReadError> {
         }
         b'*' => {
             let length = read_integer(s)?;
-            Ok(Atom::Array(length))
+            Ok(Token::Array(length))
         }
         _ => Err(ReadError::NotImplemented),
     }
@@ -207,7 +207,7 @@ mod tests {
     #[test]
     fn decodes_integers() {
         let encoded = ":123\r\n";
-        let expected = Atom::Integer(123);
+        let expected = Token::Integer(123);
 
         let mut encoded_stream = encoded.as_bytes();
         let decoded = decode(&mut encoded_stream);
@@ -245,7 +245,7 @@ mod tests {
     #[test]
     fn decodes_basic_string() {
         let encoded = "+hello\r\n";
-        let expected = Atom::SimpleString("hello".to_string());
+        let expected = Token::SimpleString("hello".to_string());
 
         let mut encoded_stream = encoded.as_bytes();
         let decoded = decode(&mut encoded_stream);
@@ -256,7 +256,7 @@ mod tests {
     #[test]
     fn decodes_error() {
         let encoded = "-ERR unknown command\r\n";
-        let expected = Atom::Error("ERR unknown command".to_string());
+        let expected = Token::Error("ERR unknown command".to_string());
 
         let mut encoded_stream = encoded.as_bytes();
         let decoded = decode(&mut encoded_stream);
@@ -267,7 +267,7 @@ mod tests {
     #[test]
     fn decodes_bulk_string() {
         let encoded = "$5\r\nhello\r\n";
-        let expected = Atom::BulkString(Some(vec![b'h', b'e', b'l', b'l', b'o']));
+        let expected = Token::BulkString(Some(vec![b'h', b'e', b'l', b'l', b'o']));
 
         let mut encoded_stream = encoded.as_bytes();
         let decoded = decode(&mut encoded_stream);
@@ -278,7 +278,7 @@ mod tests {
     #[test]
     fn decodes_bulk_string_empty() {
         let encoded = "$0\r\n\r\n";
-        let expected = Atom::BulkString(Some(vec![]));
+        let expected = Token::BulkString(Some(vec![]));
 
         let mut encoded_stream = encoded.as_bytes();
         let decoded = decode(&mut encoded_stream);
@@ -289,7 +289,7 @@ mod tests {
     #[test]
     fn decodes_bulk_string_null() {
         let encoded = "$-1\r\n";
-        let expected = Atom::BulkString(None);
+        let expected = Token::BulkString(None);
 
         let mut encoded_stream = encoded.as_bytes();
         let decoded = decode(&mut encoded_stream);
@@ -301,10 +301,10 @@ mod tests {
     fn decodes_arrays() {
         let encoded = "*3\r\n+hello\r\n+world\r\n:1\r\n";
         let expected_tokens = vec![
-            Atom::Array(3),
-            Atom::SimpleString("hello".to_string()),
-            Atom::SimpleString("world".to_string()),
-            Atom::Integer(1),
+            Token::Array(3),
+            Token::SimpleString("hello".to_string()),
+            Token::SimpleString("world".to_string()),
+            Token::Integer(1),
         ];
 
         let encoded_stream = encoded.as_bytes();
