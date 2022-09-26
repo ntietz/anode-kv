@@ -1,13 +1,15 @@
-use anode_kv::server::launch;
+use anode_kv::server::Server;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::time::Duration;
 
 #[tokio::test]
 async fn it_can_accept_connections() {
-    let (local_addr, _handle) = launch("127.0.0.1:0").await.expect("should successfully launch");
-
-    let addr = format!("127.0.0.1:{}", local_addr.port());
+    let mut server = Server::create("127.0.0.1:0").await.unwrap();
+    let addr = server.addr();
+    tokio::spawn(async move {
+        server.run().await;
+    });
 
     let connection1 = connect_and_request(addr);
     connection1.await;
@@ -15,9 +17,11 @@ async fn it_can_accept_connections() {
 
 #[tokio::test]
 async fn it_can_accept_multiple_connections() {
-    let (local_addr, _handle) = launch("127.0.0.1:0").await.expect("should successfully launch");
-
-    let addr = format!("127.0.0.1:{}", local_addr.port());
+    let mut server = Server::create("127.0.0.1:0").await.unwrap();
+    let addr = server.addr();
+    tokio::spawn(async move {
+        server.run().await;
+    });
 
     let connection1 = tokio::spawn(connect_and_request(addr.clone()));
     let connection2 = tokio::spawn(connect_and_request(addr));
@@ -28,7 +32,6 @@ async fn it_can_accept_multiple_connections() {
     drop(stream1);
     drop(stream2);
 }
-
 
 async fn connect_and_request(addr: String) -> TcpStream {
     let mut stream = tokio::net::TcpStream::connect(&addr)
