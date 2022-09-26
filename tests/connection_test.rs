@@ -1,16 +1,37 @@
 use anode_kv::server::launch;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::time::{sleep, Duration};
+use tokio::net::TcpStream;
+use tokio::time::Duration;
 
 #[tokio::test]
 async fn it_can_accept_connections() {
-    let addr = "127.0.0.1:11311"; // TODO: random port?
+    let (local_addr, _handle) = launch("127.0.0.1:0").await.expect("should successfully launch");
 
-    let _server_handle = tokio::spawn(launch(addr));
-    // naughty test, let's try to get rid of this later TODO
-    sleep(Duration::from_millis(100)).await;
+    let addr = format!("127.0.0.1:{}", local_addr.port());
 
-    let mut stream = tokio::net::TcpStream::connect(addr)
+    let connection1 = connect_and_request(addr);
+    connection1.await;
+}
+
+#[tokio::test]
+async fn it_can_accept_multiple_connections() {
+    let (local_addr, _handle) = launch("127.0.0.1:0").await.expect("should successfully launch");
+
+    let addr = format!("127.0.0.1:{}", local_addr.port());
+
+    let connection1 = tokio::spawn(connect_and_request(addr.clone()));
+    let connection2 = tokio::spawn(connect_and_request(addr));
+    let stream1 = connection1.await.expect("connection1 should finish");
+    let stream2 = connection2.await.expect("connection2 should finish");
+
+    // keep both connections alive until both are done reading
+    drop(stream1);
+    drop(stream2);
+}
+
+
+async fn connect_and_request(addr: String) -> TcpStream {
+    let mut stream = tokio::net::TcpStream::connect(&addr)
         .await
         .expect("failed to connect to server");
 
@@ -31,4 +52,6 @@ async fn it_can_accept_connections() {
     }
 
     assert_eq!(buffer, expected_response);
+
+    stream
 }
