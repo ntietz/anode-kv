@@ -5,7 +5,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 use crate::codec::{decode, encode, Token};
-use crate::command::{Command, CommandProcessor};
+use crate::command::{Command, CommandError, CommandProcessor};
 
 pub type ConnectionId = u64;
 
@@ -42,10 +42,18 @@ impl Connection {
                     tokens.push(token);
 
                     if buffer.is_empty() {
-                        let (command, consumed) = Command::from_tokens(&tokens)
-                            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                        let (command, consumed) = match Command::from_tokens(&tokens) {
+                            Ok(x) => x,
+                            Err(CommandError::InsufficientTokens) => continue,
+                            Err(e) => {
+                                return Err(std::io::Error::new(std::io::ErrorKind::Other, e))
+                            }
+                        };
+
                         if consumed < tokens.len() {
                             tokens = tokens.split_off(consumed);
+                        } else {
+                            tokens.clear();
                         }
 
                         let resp = cp.execute_command(&command);

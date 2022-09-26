@@ -1,7 +1,7 @@
 use crate::codec::Token;
 
 mod command;
-pub use command::Command;
+pub use command::{Command, CommandError};
 
 /// CommandProcessor is responsible for taking a group of tokens, executing them,
 /// and returning the result.
