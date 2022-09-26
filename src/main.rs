@@ -1,10 +1,13 @@
-use anode_kv::server::launch;
+use anode_kv::server::Server;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     env_logger::init();
     let addr = "127.0.0.1:11311";
-    let (_addr, handle) = launch(addr).await?;
+    let mut server = Server::create(addr).await.expect("should launch");
+    let handle = tokio::spawn(async move {
+        server.run().await;
+    });
     handle.await.expect("should shut down gracefully");
     Ok(())
 }
