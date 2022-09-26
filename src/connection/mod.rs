@@ -1,95 +1,53 @@
-use bytes::{Buf, BytesMut};
-use std::collections::HashSet;
-use std::io::Cursor;
 use std::net::SocketAddr;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 use tokio::net::TcpStream;
 
-use crate::codec::{decode, encode, Atom};
+mod connection;
+mod tracker;
 
-type ConnectionId = u64;
+pub use connection::{Connection, ConnectionId};
+pub use tracker::ConnectionTracker;
 
-pub struct Connection {
-    id: ConnectionId,
-    socket: TcpStream,
-    addr: SocketAddr,
-}
-
+#[derive(Clone)]
 pub struct ConnectionManager {
-    active_connections: HashSet<ConnectionId>,
-    latest_id: u64,
+    latest_id: Arc<AtomicU64>,
+    tracker: Arc<Mutex<ConnectionTracker>>,
 }
 
 impl Default for ConnectionManager {
     fn default() -> Self {
         Self {
-            active_connections: HashSet::new(),
-            latest_id: 0,
+            latest_id: Arc::new(AtomicU64::new(0)),
+            tracker: Arc::new(Mutex::new(ConnectionTracker::default())),
         }
     }
 }
 
 impl ConnectionManager {
-    pub fn add_connection(&mut self, socket: TcpStream, addr: SocketAddr) -> Connection {
-        let id = self.assign_next_id();
-        let connection = Connection { id, socket, addr };
+    pub async fn take_connection(&mut self, socket: TcpStream, addr: SocketAddr) -> ConnectionId {
+        let id = self.latest_id.fetch_add(1, Ordering::SeqCst);
+
+        let mut connection = Connection::new(id, socket, addr);
         log::info!("accepted new connection. id={}, addr={}", id, addr);
 
-        self.active_connections.insert(id);
+        let tracker = self.tracker.clone();
 
-        connection
-    }
-
-    pub fn remove_connection(&mut self, id: ConnectionId) -> bool {
-        self.active_connections.remove(&id)
-    }
-
-    fn assign_next_id(&mut self) -> u64 {
-        self.latest_id += 1;
-        self.latest_id
-    }
-}
-
-impl Connection {
-    pub async fn handle(&mut self) -> std::io::Result<()> {
-        log::info!("Accepting connection from {}", self.addr);
-
-        let mut buffer = BytesMut::with_capacity(4 * 1024);
-
-        loop {
-            if 0 == self.socket.read_buf(&mut buffer).await? {
-                println!("done");
-                break;
-            }
-
-            loop {
-                let mut cursor = Cursor::new(&buffer[..]);
-                if let Ok(token) = decode(&mut cursor) {
-                    let pos = cursor.position() as usize;
-                    println!("pos: {}, token: {:?}, buf: {:?}", pos, token, buffer);
-                    buffer.advance(pos);
-
-                    if buffer.is_empty() {
-                        let resp = Atom::Error("ERR not implemented yet".to_string());
-                        let mut write_buf: Vec<u8> = vec![];
-                        encode(&mut write_buf, &resp)
-                            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?; // TODO: handle error
-                        println!("{:?}", write_buf);
-
-                        self.socket.write_all(&write_buf).await?;
-                    }
-                } else {
-                    break;
+        let handle = tokio::spawn(async move {
+            match connection.handle().await {
+                Ok(()) => {
+                    log::info!("connection {}: terminated gracefully", id);
+                    tracker.lock().unwrap().remove(id);
                 }
+                Err(e) => {
+                    log::error!("connection {}: error {}", id, e);
+                    tracker.lock().unwrap().remove(id);
+                }
+            };
+        });
 
-                println!("buf: {:?}", buffer);
-            }
-        }
+        self.tracker.lock().unwrap().add(id, handle);
 
-        Ok(())
+        id
     }
-}
-
-pub async fn run_connection(mut connection: Connection) -> std::io::Result<()> {
-    connection.handle().await
 }
