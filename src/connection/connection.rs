@@ -6,6 +6,7 @@ use tokio::net::TcpStream;
 
 use crate::codec::{decode, encode, Token};
 use crate::command::{Command, CommandError, CommandProcessor};
+use crate::server::Context;
 
 pub type ConnectionId = u64;
 
@@ -13,19 +14,24 @@ pub struct Connection {
     id: ConnectionId,
     socket: TcpStream,
     addr: SocketAddr,
+    context: Context,
 }
 
 impl Connection {
-    pub fn new(id: ConnectionId, socket: TcpStream, addr: SocketAddr) -> Self {
-        Connection { id, socket, addr }
+    pub fn new(ctx: Context, id: ConnectionId, socket: TcpStream, addr: SocketAddr) -> Self {
+        Connection {
+            id,
+            socket,
+            addr,
+            context: ctx,
+        }
     }
 
     pub async fn handle(&mut self) -> std::io::Result<()> {
         log::info!("(id={}) accepting connection from {}", self.id, self.addr);
 
         let mut buffer = BytesMut::with_capacity(4 * 1024);
-        let cp = CommandProcessor {}; // TODO: this should probably be shared? or we send via a
-                                      // queue?
+        let cp = CommandProcessor::new(self.context.clone());
 
         let mut tokens: Vec<Token> = vec![];
 
@@ -56,7 +62,7 @@ impl Connection {
                             tokens.clear();
                         }
 
-                        let resp = cp.execute_command(&command);
+                        let resp = cp.execute_command(&command).await;
                         for token in resp {
                             let mut write_buf: Vec<u8> = vec![];
                             encode(&mut write_buf, &token)

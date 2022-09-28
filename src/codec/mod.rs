@@ -342,7 +342,7 @@ mod tests {
             let encoded = encode(&mut buf, &decoded.unwrap());
 
             assert!(encoded.is_ok());
-            assert_eq!(message.bytes().collect::<Vec<u8>>(), buf); // TODO: fix
+            assert_eq!(message.bytes().collect::<Vec<u8>>(), buf);
         }
     }
 

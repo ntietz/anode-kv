@@ -33,6 +33,4 @@ impl ConnectionTracker {
             self.connection_handles.remove(&id);
         }
     }
-
-    // TODO: clean up terminated connections
 }

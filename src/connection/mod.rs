@@ -6,6 +6,7 @@ use tokio::net::TcpStream;
 mod connection;
 mod tracker;
 
+pub use crate::server::Context;
 pub use connection::{Connection, ConnectionId};
 pub use tracker::ConnectionTracker;
 
@@ -25,10 +26,15 @@ impl Default for ConnectionManager {
 }
 
 impl ConnectionManager {
-    pub async fn take_connection(&mut self, socket: TcpStream, addr: SocketAddr) -> ConnectionId {
+    pub async fn take_connection(
+        &mut self,
+        ctx: Context,
+        socket: TcpStream,
+        addr: SocketAddr,
+    ) -> ConnectionId {
         let id = self.latest_id.fetch_add(1, Ordering::SeqCst);
 
-        let mut connection = Connection::new(id, socket, addr);
+        let mut connection = Connection::new(ctx, id, socket, addr);
         log::info!("accepted new connection. id={}, addr={}", id, addr);
 
         let tracker = self.tracker.clone();

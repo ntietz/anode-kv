@@ -5,6 +5,8 @@ use thiserror::Error;
 pub enum Command {
     Echo(Vec<u8>),
     Command,
+    Get(Vec<u8>),
+    Set(Vec<u8>, Vec<u8>),
 }
 
 #[derive(Error, Debug, PartialEq)]
@@ -63,6 +65,35 @@ impl Command {
                     return Err(CommandError::Malformed);
                 }
                 Ok((Command::Command, 2))
+            }
+            _ if cmd == "GET" => {
+                if length != 2 {
+                    return Err(CommandError::Malformed);
+                }
+                let key = match &tokens[2] {
+                    Token::SimpleString(s) => s.bytes().collect(),
+                    Token::BulkString(Some(s)) => s.clone(),
+                    _ => return Err(CommandError::Malformed),
+                };
+
+                Ok((Command::Get(key), 3))
+            }
+            _ if cmd == "SET" => {
+                if length != 3 {
+                    return Err(CommandError::Malformed);
+                }
+                let key = match &tokens[2] {
+                    Token::SimpleString(s) => s.bytes().collect(),
+                    Token::BulkString(Some(s)) => s.clone(),
+                    _ => return Err(CommandError::Malformed),
+                };
+                let value = match &tokens[3] {
+                    Token::SimpleString(s) => s.bytes().collect(),
+                    Token::BulkString(Some(s)) => s.clone(),
+                    _ => return Err(CommandError::Malformed),
+                };
+
+                Ok((Command::Set(key, value), 4))
             }
             unk => Err(CommandError::UnknownCommand(unk.to_string())),
         }
