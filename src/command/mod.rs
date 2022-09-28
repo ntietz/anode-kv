@@ -75,10 +75,13 @@ fn error_response(msg: String) -> Vec<Token> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::sync::mpsc;
 
     #[tokio::test]
     async fn it_echoes() {
-        let cp = CommandProcessor::new(Context::dummy());
+        let (tx, _rx) = mpsc::channel(1);
+        let context = Context::new(tx);
+        let cp = CommandProcessor::new(context);
 
         let cmd = Command::Echo(vec![0u8, 1u8, 2u8]);
         let expected = vec![Token::BulkString(Some(vec![0u8, 1u8, 2u8]))];

@@ -25,7 +25,10 @@ impl Server {
         let listener = TcpListener::bind(addr).await?;
         let connection_manager = ConnectionManager::default();
 
-        let (tx, rx) = mpsc::channel(100); // TODO: tunable option?
+        // TODO: do experiments to determine what size channel makes sense.
+        // This should probably be an input parameter so it can be tuned
+        // based on hardware and use cases.
+        let (tx, rx) = mpsc::channel(10);
 
         let storage = Arc::new(Mutex::new(InMemoryStorage::new(rx)));
         let context = Context::new(tx);
@@ -68,10 +71,5 @@ impl Server {
 impl Context {
     pub fn new(storage_queue: StorageSendQueue) -> Self {
         Self { storage_queue }
-    }
-
-    pub fn dummy() -> Self {
-        let (tx, _rx) = mpsc::channel(1);
-        Self { storage_queue: tx }
     }
 }
