@@ -15,6 +15,12 @@ pub struct Server {
     context: Context,
 }
 
+/// Context is used to pass dependencies into connection handlers and the command
+/// processor.
+///
+/// This is Clone and certain constraints will be upheld:
+///  - Anything which is present will be efficient to clone (or requires clone, like queues)
+///  - Any shared state will be wrapped in Arc<Mutex<>> or similar to ensure safety
 #[derive(Clone)]
 pub struct Context {
     pub storage_queue: StorageSendQueue,
