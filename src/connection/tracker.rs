@@ -1,20 +1,13 @@
 use std::collections::{HashMap, HashSet};
+
 use tokio::task::JoinHandle;
 
 use super::ConnectionId;
 
+#[derive(Default)]
 pub struct ConnectionTracker {
     active_connections: HashSet<ConnectionId>,
     connection_handles: HashMap<ConnectionId, JoinHandle<()>>,
-}
-
-impl Default for ConnectionTracker {
-    fn default() -> Self {
-        Self {
-            active_connections: HashSet::new(),
-            connection_handles: HashMap::new(),
-        }
-    }
 }
 
 impl ConnectionTracker {
@@ -33,6 +26,4 @@ impl ConnectionTracker {
             self.connection_handles.remove(&id);
         }
     }
-
-    // TODO: clean up terminated connections
 }

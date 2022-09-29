@@ -1,13 +1,16 @@
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+
 use tokio::net::TcpStream;
 
-mod connection;
+mod conn;
 mod tracker;
 
-pub use connection::{Connection, ConnectionId};
+pub use conn::{Connection, ConnectionId};
 pub use tracker::ConnectionTracker;
+
+use crate::server::Context;
 
 #[derive(Clone)]
 pub struct ConnectionManager {
@@ -25,10 +28,15 @@ impl Default for ConnectionManager {
 }
 
 impl ConnectionManager {
-    pub async fn take_connection(&mut self, socket: TcpStream, addr: SocketAddr) -> ConnectionId {
+    pub async fn take_connection(
+        &mut self,
+        context: Context,
+        socket: TcpStream,
+        addr: SocketAddr,
+    ) -> ConnectionId {
         let id = self.latest_id.fetch_add(1, Ordering::SeqCst);
 
-        let mut connection = Connection::new(id, socket, addr);
+        let mut connection = Connection::new(context, id, socket, addr);
         log::info!("accepted new connection. id={}, addr={}", id, addr);
 
         let tracker = self.tracker.clone();
