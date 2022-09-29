@@ -48,8 +48,8 @@ impl Command {
         };
         log::info!("length: {}", length);
 
-        match cmd {
-            _ if cmd == "ECHO" => {
+        match cmd.as_str() {
+            "ECHO" => {
                 if length != 2 {
                     return Err(CommandError::Malformed);
                 }
@@ -60,13 +60,13 @@ impl Command {
                 };
                 Ok((Command::Echo(reply_token), 3))
             }
-            _ if cmd == "COMMAND" => {
+            "COMMAND" => {
                 if length != 1 {
                     return Err(CommandError::Malformed);
                 }
                 Ok((Command::Command, 2))
             }
-            _ if cmd == "GET" => {
+            "GET" => {
                 if length != 2 {
                     return Err(CommandError::Malformed);
                 }
@@ -78,7 +78,7 @@ impl Command {
 
                 Ok((Command::Get(key), 3))
             }
-            _ if cmd == "SET" => {
+            "SET" => {
                 if length != 3 {
                     return Err(CommandError::Malformed);
                 }
