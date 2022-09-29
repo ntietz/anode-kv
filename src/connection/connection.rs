@@ -19,12 +19,12 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub fn new(ctx: Context, id: ConnectionId, socket: TcpStream, addr: SocketAddr) -> Self {
+    pub fn new(context: Context, id: ConnectionId, socket: TcpStream, addr: SocketAddr) -> Self {
         Connection {
             id,
             socket,
             addr,
-            context: ctx,
+            context,
         }
     }
 
