@@ -15,15 +15,33 @@ pub struct CommandProcessor {
     context: Context,
 }
 
+#[derive(Debug)]
+pub struct ExecutionResult(pub Vec<Token>);
+
+impl IntoIterator for ExecutionResult {
+    type Item = Token;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl <S: AsRef<str>> From<S> for ExecutionResult {
+    fn from(s: S) -> Self {
+        ExecutionResult(vec![Token::Error(s.as_ref().to_string())])
+    }
+}
+
 impl CommandProcessor {
     pub fn new(context: Context) -> Self {
         Self { context }
     }
 
-    pub async fn execute_command(&self, command: &Command) -> Vec<Token> {
+    pub async fn execute_command(&self, command: &Command) -> ExecutionResult {
         match command {
-            Command::Echo(t) => vec![Token::BulkString(Some(t.clone()))],
-            Command::Command => vec![Token::BulkString(Some("ECHO".bytes().collect()))],
+            Command::Echo(t) => ExecutionResult(vec![Token::BulkString(Some(t.clone()))]),
+            Command::Command => ExecutionResult(vec![Token::BulkString(Some("ECHO".bytes().collect()))]),
             Command::Get(key) => {
                 let cmd = StorageCommand::Get(key.clone());
                 let (tx, rx) = oneshot::channel();
@@ -34,14 +52,14 @@ impl CommandProcessor {
                     .await;
 
                 if let Err(_) = res {
-                    return error_response("timeout while sending to storage".to_string());
+                    return "timeout while sending to storage".into();
                 }
 
                 match rx.await {
-                    Ok(Ok(None)) => vec![Token::BulkString(None)],
-                    Ok(Ok(Some(value))) => vec![Token::BulkString(Some(value))],
-                    Ok(Err(_)) => error_response("internal storage error".to_string()),
-                    Err(_) => error_response("no response from storage".to_string()),
+                    Ok(Ok(None)) => ExecutionResult(vec![Token::BulkString(None)]),
+                    Ok(Ok(Some(value))) => ExecutionResult(vec![Token::BulkString(Some(value))]),
+                    Ok(Err(_)) => "internal storage error".into(),
+                    Err(_) => "no response from storage".into(),
                 }
             }
             Command::Set(key, value) => {
@@ -54,22 +72,18 @@ impl CommandProcessor {
                     .await;
 
                 if let Err(_) = res {
-                    return error_response("timeout while sending to storage".to_string());
+                    return "timeout while sending to storage".into();
                 }
 
                 match rx.await {
-                    Ok(Ok(None)) => vec![Token::SimpleString("OK".to_string())],
-                    Ok(Ok(Some(value))) => vec![Token::BulkString(Some(value))],
-                    Ok(Err(_)) => error_response("internal storage error".to_string()),
-                    Err(_) => error_response("no response from storage".to_string()),
+                    Ok(Ok(None)) => ExecutionResult(vec![Token::SimpleString("OK".to_string())]),
+                    Ok(Ok(Some(value))) => ExecutionResult(vec![Token::BulkString(Some(value))]),
+                    Ok(Err(_)) => "internal storage error".into(),
+                    Err(_) => "no response from storage".into(),
                 }
             }
         }
     }
-}
-
-fn error_response(msg: String) -> Vec<Token> {
-    vec![Token::Error(msg)]
 }
 
 #[cfg(test)]
@@ -86,7 +100,7 @@ mod tests {
         let cmd = Command::Echo(vec![0u8, 1u8, 2u8]);
         let expected = vec![Token::BulkString(Some(vec![0u8, 1u8, 2u8]))];
 
-        let result = cp.execute_command(&cmd).await;
+        let result = cp.execute_command(&cmd).await.0;
 
         assert_eq!(expected, result);
     }
