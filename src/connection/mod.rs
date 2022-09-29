@@ -1,14 +1,16 @@
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+
 use tokio::net::TcpStream;
 
 mod connection;
 mod tracker;
 
-pub use crate::server::Context;
 pub use connection::{Connection, ConnectionId};
 pub use tracker::ConnectionTracker;
+
+pub use crate::server::Context;
 
 #[derive(Clone)]
 pub struct ConnectionManager {

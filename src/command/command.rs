@@ -1,12 +1,14 @@
-use crate::codec::Token;
 use thiserror::Error;
+
+use crate::codec::Token;
+use crate::types::{Key, Value};
 
 #[derive(Debug, PartialEq)]
 pub enum Command {
-    Echo(Vec<u8>),
+    Echo(Value),
     Command,
-    Get(Vec<u8>),
-    Set(Vec<u8>, Vec<u8>),
+    Get(Key),
+    Set(Key, Value),
 }
 
 #[derive(Error, Debug, PartialEq)]
@@ -58,7 +60,7 @@ impl Command {
                     Token::BulkString(Some(s)) => s.clone(),
                     _ => return Err(CommandError::Malformed),
                 };
-                Ok((Command::Echo(reply_token), 3))
+                Ok((Command::Echo(reply_token.into()), 3))
             }
             "COMMAND" => {
                 if length != 1 {
@@ -76,7 +78,7 @@ impl Command {
                     _ => return Err(CommandError::Malformed),
                 };
 
-                Ok((Command::Get(key), 3))
+                Ok((Command::Get(key.into()), 3))
             }
             "SET" => {
                 if length != 3 {
@@ -93,7 +95,7 @@ impl Command {
                     _ => return Err(CommandError::Malformed),
                 };
 
-                Ok((Command::Set(key, value), 4))
+                Ok((Command::Set(key.into(), value.into()), 4))
             }
             unk => Err(CommandError::UnknownCommand(unk.to_string())),
         }
@@ -136,7 +138,8 @@ mod tests {
             Token::SimpleString("echo".to_string()),
             Token::SimpleString(msg.clone()),
         ];
-        let expected = Ok((Command::Echo(msg.bytes().collect()), 3));
+        let bytes: Vec<_> = msg.bytes().collect();
+        let expected = Ok((Command::Echo(bytes.into()), 3));
 
         assert_eq!(expected, Command::from_tokens(&input));
     }

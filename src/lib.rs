@@ -6,4 +6,5 @@ pub mod command;
 pub mod connection;
 pub mod server;
 pub mod storage;
+pub mod types;
 pub mod worker;

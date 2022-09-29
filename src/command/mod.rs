@@ -27,7 +27,7 @@ impl IntoIterator for ExecutionResult {
     }
 }
 
-impl <S: AsRef<str>> From<S> for ExecutionResult {
+impl<S: AsRef<str>> From<S> for ExecutionResult {
     fn from(s: S) -> Self {
         ExecutionResult(vec![Token::Error(s.as_ref().to_string())])
     }
@@ -40,8 +40,10 @@ impl CommandProcessor {
 
     pub async fn execute_command(&self, command: &Command) -> ExecutionResult {
         match command {
-            Command::Echo(t) => ExecutionResult(vec![Token::BulkString(Some(t.clone()))]),
-            Command::Command => ExecutionResult(vec![Token::BulkString(Some("ECHO".bytes().collect()))]),
+            Command::Echo(t) => ExecutionResult(vec![t.clone().into()]),
+            Command::Command => {
+                ExecutionResult(vec![Token::BulkString(Some("ECHO".bytes().collect()))])
+            }
             Command::Get(key) => {
                 let cmd = StorageCommand::Get(key.clone());
                 let (tx, rx) = oneshot::channel();
@@ -57,7 +59,7 @@ impl CommandProcessor {
 
                 match rx.await {
                     Ok(Ok(None)) => ExecutionResult(vec![Token::BulkString(None)]),
-                    Ok(Ok(Some(value))) => ExecutionResult(vec![Token::BulkString(Some(value))]),
+                    Ok(Ok(Some(value))) => ExecutionResult(vec![value.into()]),
                     Ok(Err(_)) => "internal storage error".into(),
                     Err(_) => "no response from storage".into(),
                 }
@@ -77,7 +79,7 @@ impl CommandProcessor {
 
                 match rx.await {
                     Ok(Ok(None)) => ExecutionResult(vec![Token::SimpleString("OK".to_string())]),
-                    Ok(Ok(Some(value))) => ExecutionResult(vec![Token::BulkString(Some(value))]),
+                    Ok(Ok(Some(value))) => ExecutionResult(vec![value.into()]),
                     Ok(Err(_)) => "internal storage error".into(),
                     Err(_) => "no response from storage".into(),
                 }
@@ -88,8 +90,9 @@ impl CommandProcessor {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tokio::sync::mpsc;
+
+    use super::*;
 
     #[tokio::test]
     async fn it_echoes() {
@@ -97,7 +100,7 @@ mod tests {
         let context = Context::new(tx);
         let cp = CommandProcessor::new(context);
 
-        let cmd = Command::Echo(vec![0u8, 1u8, 2u8]);
+        let cmd = Command::Echo(Bytes(vec![0u8, 1u8, 2u8]));
         let expected = vec![Token::BulkString(Some(vec![0u8, 1u8, 2u8]))];
 
         let result = cp.execute_command(&cmd).await.0;

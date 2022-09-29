@@ -2,6 +2,8 @@ use std::io::{Read, Write};
 
 use thiserror::Error;
 
+use crate::types::Bytes;
+
 pub const CRLF: &str = "\r\n";
 
 #[derive(Clone, Debug, PartialEq)]
@@ -11,6 +13,12 @@ pub enum Token {
     Error(String),
     BulkString(Option<Vec<u8>>),
     Array(i64),
+}
+
+impl From<Bytes> for Token {
+    fn from(b: Bytes) -> Self {
+        Token::BulkString(Some(b.0))
+    }
 }
 
 #[derive(Error, Debug)]
@@ -201,8 +209,9 @@ fn read_bulk_string<T: Read>(s: &mut T, length: usize) -> Result<Vec<u8>, ReadEr
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use test::Bencher;
+
+    use super::*;
 
     #[test]
     fn decodes_integers() {

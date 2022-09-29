@@ -1,25 +1,27 @@
+use std::collections::HashMap;
+
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
-use std::collections::HashMap;
+use crate::types::{Key, Value};
 
 pub enum StorageCommand {
-    Set(Vec<u8>, Vec<u8>),
-    Get(Vec<u8>),
+    Set(Key, Value),
+    Get(Key),
 }
 
 pub struct InMemoryStorage {
-    data: HashMap<Vec<u8>, Vec<u8>>,
+    data: HashMap<Key, Value>,
     recv_queue: StorageRecvQueue,
 }
 
 pub type StorageRecvQueue = mpsc::Receiver<(
     StorageCommand,
-    oneshot::Sender<Result<Option<Vec<u8>>, std::io::Error>>,
+    oneshot::Sender<Result<Option<Value>, std::io::Error>>,
 )>;
 pub type StorageSendQueue = mpsc::Sender<(
     StorageCommand,
-    oneshot::Sender<Result<Option<Vec<u8>>, std::io::Error>>,
+    oneshot::Sender<Result<Option<Value>, std::io::Error>>,
 )>;
 
 impl InMemoryStorage {
