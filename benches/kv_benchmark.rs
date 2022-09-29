@@ -1,8 +1,7 @@
 use std::io::Cursor;
 
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
-
 use anode_kv::codec::decode;
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 fn kv_benchmark(c: &mut Criterion) {
     c.bench_function("parse_string", |b| {
