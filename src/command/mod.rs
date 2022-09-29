@@ -6,8 +6,8 @@ use crate::codec::Token;
 use crate::server::Context;
 use crate::storage::StorageCommand;
 
-mod command;
-pub use command::{Command, CommandError};
+mod types;
+pub use types::{Command, CommandError};
 
 /// CommandProcessor is responsible for taking a group of tokens, executing them,
 /// and returning the result.
@@ -53,7 +53,7 @@ impl CommandProcessor {
                     .send_timeout((cmd, tx), Duration::from_millis(1_000))
                     .await;
 
-                if let Err(_) = res {
+                if res.is_err() {
                     return "timeout while sending to storage".into();
                 }
 
@@ -73,7 +73,7 @@ impl CommandProcessor {
                     .send_timeout((cmd, tx), Duration::from_millis(1_000))
                     .await;
 
-                if let Err(_) = res {
+                if res.is_err() {
                     return "timeout while sending to storage".into();
                 }
 
@@ -93,6 +93,7 @@ mod tests {
     use tokio::sync::mpsc;
 
     use super::*;
+    use crate::types::Bytes;
 
     #[tokio::test]
     async fn it_echoes() {

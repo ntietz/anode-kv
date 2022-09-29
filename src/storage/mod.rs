@@ -41,7 +41,7 @@ impl InMemoryStorage {
                 StorageCommand::Get(key) => Ok(self.data.get(&key).cloned()),
             };
 
-            if let Err(_) = tx.send(response) {
+            if tx.send(response).is_err() {
                 log::error!("could not return value to requester; early disconnection?");
             }
         }

@@ -4,10 +4,10 @@ use std::sync::{Arc, Mutex};
 
 use tokio::net::TcpStream;
 
-mod connection;
+mod conn;
 mod tracker;
 
-pub use connection::{Connection, ConnectionId};
+pub use conn::{Connection, ConnectionId};
 pub use tracker::ConnectionTracker;
 
 use crate::server::Context;

@@ -48,7 +48,7 @@ impl Connection {
                     buffer.advance(pos);
                     tokens.push(token);
 
-                    if buffer.is_empty() && tokens.len() > 0 {
+                    if buffer.is_empty() && !tokens.is_empty() {
                         let (command, consumed) = match Command::from_tokens(&tokens) {
                             Ok(x) => x,
                             Err(CommandError::InsufficientTokens) => continue,

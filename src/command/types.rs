@@ -3,7 +3,7 @@ use thiserror::Error;
 use crate::codec::Token;
 use crate::types::{Bytes, Key, Value};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum Command {
     Echo(Value),
     Command,
@@ -11,7 +11,7 @@ pub enum Command {
     Set(Key, Value),
 }
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug, Eq, PartialEq)]
 pub enum CommandError {
     #[error("insufficient tokens")]
     InsufficientTokens,
@@ -25,7 +25,7 @@ pub enum CommandError {
 
 impl Command {
     pub fn from_tokens(tokens: &[Token]) -> Result<(Command, usize), CommandError> {
-        if tokens.len() == 0 {
+        if tokens.is_empty() {
             return Err(CommandError::InsufficientTokens);
         }
 
@@ -35,7 +35,7 @@ impl Command {
             "ECHO" => {
                 validate_length(length, ECHO_LENGTH)?;
                 let reply_token = string_token_as_bytes(tokens.get(2))?;
-                Ok((Command::Echo(reply_token.into()), ECHO_LENGTH + 1))
+                Ok((Command::Echo(reply_token), ECHO_LENGTH + 1))
             }
             "COMMAND" => {
                 validate_length(length, COMMAND_LENGTH)?;
@@ -45,14 +45,14 @@ impl Command {
                 validate_length(length, GET_LENGTH)?;
                 let key = string_token_as_bytes(tokens.get(2))?;
 
-                Ok((Command::Get(key.into()), GET_LENGTH + 1))
+                Ok((Command::Get(key), GET_LENGTH + 1))
             }
             "SET" => {
                 validate_length(length, SET_LENGTH)?;
                 let key = string_token_as_bytes(tokens.get(2))?;
                 let value = string_token_as_bytes(tokens.get(3))?;
 
-                Ok((Command::Set(key.into(), value.into()), SET_LENGTH + 1))
+                Ok((Command::Set(key, value), SET_LENGTH + 1))
             }
             unk => Err(CommandError::UnknownCommand(unk.to_string())),
         }

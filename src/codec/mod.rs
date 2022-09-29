@@ -6,7 +6,7 @@ use crate::types::Bytes;
 
 pub const CRLF: &str = "\r\n";
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Token {
     SimpleString(String),
     Integer(i64),
