@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 use crate::codec::Token;
-use crate::types::{Key, Value};
+use crate::types::{Bytes, Key, Value};
 
 #[derive(Debug, PartialEq)]
 pub enum Command {
@@ -25,81 +25,80 @@ pub enum CommandError {
 
 impl Command {
     pub fn from_tokens(tokens: &[Token]) -> Result<(Command, usize), CommandError> {
-        log::info!("parsing tokens: {:?}", tokens);
         if tokens.len() == 0 {
             return Err(CommandError::InsufficientTokens);
         }
 
-        let length = match tokens[0] {
-            Token::Array(l) if l > 0 => l as usize,
-            _ => return Err(CommandError::Malformed),
-        };
-        log::info!("length: {}", length);
-
-        if tokens.len() - 1 < length {
-            return Err(CommandError::InsufficientTokens);
-        }
-
-        let cmd = match &tokens[1] {
-            Token::SimpleString(c) => c.to_uppercase(),
-            Token::BulkString(Some(c)) => match std::str::from_utf8(c) {
-                Ok(s) => s.to_uppercase(),
-                Err(_) => return Err(CommandError::Malformed),
-            },
-            _ => return Err(CommandError::Malformed),
-        };
-        log::info!("length: {}", length);
+        let (length, cmd) = get_command(tokens)?;
 
         match cmd.as_str() {
             "ECHO" => {
-                if length != 2 {
-                    return Err(CommandError::Malformed);
-                }
-                let reply_token = match &tokens[2] {
-                    Token::SimpleString(s) => s.bytes().collect(),
-                    Token::BulkString(Some(s)) => s.clone(),
-                    _ => return Err(CommandError::Malformed),
-                };
-                Ok((Command::Echo(reply_token.into()), 3))
+                validate_length(length, ECHO_LENGTH)?;
+                let reply_token = string_token_as_bytes(tokens.get(2))?;
+                Ok((Command::Echo(reply_token.into()), ECHO_LENGTH + 1))
             }
             "COMMAND" => {
-                if length != 1 {
-                    return Err(CommandError::Malformed);
-                }
-                Ok((Command::Command, 2))
+                validate_length(length, COMMAND_LENGTH)?;
+                Ok((Command::Command, COMMAND_LENGTH + 1))
             }
             "GET" => {
-                if length != 2 {
-                    return Err(CommandError::Malformed);
-                }
-                let key = match &tokens[2] {
-                    Token::SimpleString(s) => s.bytes().collect(),
-                    Token::BulkString(Some(s)) => s.clone(),
-                    _ => return Err(CommandError::Malformed),
-                };
+                validate_length(length, GET_LENGTH)?;
+                let key = string_token_as_bytes(tokens.get(2))?;
 
-                Ok((Command::Get(key.into()), 3))
+                Ok((Command::Get(key.into()), GET_LENGTH + 1))
             }
             "SET" => {
-                if length != 3 {
-                    return Err(CommandError::Malformed);
-                }
-                let key = match &tokens[2] {
-                    Token::SimpleString(s) => s.bytes().collect(),
-                    Token::BulkString(Some(s)) => s.clone(),
-                    _ => return Err(CommandError::Malformed),
-                };
-                let value = match &tokens[3] {
-                    Token::SimpleString(s) => s.bytes().collect(),
-                    Token::BulkString(Some(s)) => s.clone(),
-                    _ => return Err(CommandError::Malformed),
-                };
+                validate_length(length, SET_LENGTH)?;
+                let key = string_token_as_bytes(tokens.get(2))?;
+                let value = string_token_as_bytes(tokens.get(3))?;
 
-                Ok((Command::Set(key.into(), value.into()), 4))
+                Ok((Command::Set(key.into(), value.into()), SET_LENGTH + 1))
             }
             unk => Err(CommandError::UnknownCommand(unk.to_string())),
         }
     }
+}
+
+const ECHO_LENGTH: usize = 2;
+const COMMAND_LENGTH: usize = 1;
+const GET_LENGTH: usize = 2;
+const SET_LENGTH: usize = 3;
+
+fn get_command(tokens: &[Token]) -> Result<(usize, String), CommandError> {
+    let length = match tokens.get(0) {
+        Some(Token::Array(l)) if (*l) > 0 => (*l) as usize,
+        _ => return Err(CommandError::Malformed),
+    };
+
+    if tokens.len() - 1 < length {
+        return Err(CommandError::InsufficientTokens);
+    }
+
+    let cmd = match tokens.get(1) {
+        Some(Token::SimpleString(c)) => c.to_uppercase(),
+        Some(Token::BulkString(Some(c))) => match std::str::from_utf8(c) {
+            Ok(s) => s.to_uppercase(),
+            Err(_) => return Err(CommandError::Malformed),
+        },
+        _ => return Err(CommandError::Malformed),
+    };
+
+    Ok((length, cmd))
+}
+
+fn string_token_as_bytes(token: Option<&Token>) -> Result<Bytes, CommandError> {
+    match token {
+        Some(Token::SimpleString(s)) => Ok(s.bytes().collect::<Vec<u8>>().into()),
+        Some(Token::BulkString(Some(s))) => Ok(s.clone().into()),
+        _ => Err(CommandError::Malformed),
+    }
+}
+
+fn validate_length(length: usize, expected_length: usize) -> Result<(), CommandError> {
+    if length != expected_length {
+        return Err(CommandError::Malformed);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
