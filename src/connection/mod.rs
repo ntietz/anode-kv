@@ -10,7 +10,7 @@ mod tracker;
 pub use connection::{Connection, ConnectionId};
 pub use tracker::ConnectionTracker;
 
-pub use crate::server::Context;
+use crate::server::Context;
 
 #[derive(Clone)]
 pub struct ConnectionManager {
