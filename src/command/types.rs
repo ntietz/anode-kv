@@ -9,6 +9,7 @@ pub enum Command {
     Command,
     Get(Key),
     Set(Key, Value),
+    Unknown(String),
 }
 
 #[derive(Error, Debug, Eq, PartialEq)]
@@ -18,9 +19,6 @@ pub enum CommandError {
 
     #[error("malformed input")]
     Malformed,
-
-    #[error("unknown command {0}")]
-    UnknownCommand(String),
 }
 
 impl Command {
@@ -54,7 +52,7 @@ impl Command {
 
                 Ok((Command::Set(key, value), SET_LENGTH + 1))
             }
-            unk => Err(CommandError::UnknownCommand(unk.to_string())),
+            unk => Ok((Command::Unknown(unk.to_string()), length + 1)),
         }
     }
 }
