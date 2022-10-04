@@ -84,6 +84,14 @@ impl CommandProcessor {
                     Err(_) => "no response from storage".into(),
                 }
             }
+            Command::Decr(_key) => {
+                // TODO
+                return format!("DECR is not implemented yet").into()
+            }
+            Command::Incr(_key) => {
+                // TODO
+                return format!("INCR is not implemented yet").into()
+            }
             Command::Unknown(cmd) => {
                 return format!("{} is not implemented", cmd).into()
             }
@@ -96,7 +104,7 @@ mod tests {
     use tokio::sync::mpsc;
 
     use super::*;
-    use crate::types::Bytes;
+    use crate::types::Blob;
 
     #[tokio::test]
     async fn it_echoes() {
@@ -104,7 +112,7 @@ mod tests {
         let context = Context::new(tx);
         let cp = CommandProcessor::new(context);
 
-        let cmd = Command::Echo(Bytes(vec![0u8, 1u8, 2u8]));
+        let cmd = Command::Echo(Blob(vec![0u8, 1u8, 2u8]));
         let expected = vec![Token::BulkString(Some(vec![0u8, 1u8, 2u8]))];
 
         let result = cp.execute_command(&cmd).await.0;

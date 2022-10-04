@@ -2,7 +2,7 @@ use std::io::{Read, Write};
 
 use thiserror::Error;
 
-use crate::types::Bytes;
+use crate::types::Blob;
 
 pub const CRLF: &str = "\r\n";
 
@@ -15,8 +15,8 @@ pub enum Token {
     Array(i64),
 }
 
-impl From<Bytes> for Token {
-    fn from(b: Bytes) -> Self {
+impl From<Blob> for Token {
+    fn from(b: Blob) -> Self {
         Token::BulkString(Some(b.0))
     }
 }

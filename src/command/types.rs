@@ -1,14 +1,20 @@
 use thiserror::Error;
 
 use crate::codec::Token;
-use crate::types::{Bytes, Key, Value};
+use crate::types::{Blob, Key, Value};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Command {
     Echo(Value),
+
     Command,
+
     Get(Key),
     Set(Key, Value),
+
+    Decr(Key),
+    Incr(Key),
+
     Unknown(String),
 }
 
@@ -84,7 +90,7 @@ fn get_command(tokens: &[Token]) -> Result<(usize, String), CommandError> {
     Ok((length, cmd))
 }
 
-fn string_token_as_bytes(token: Option<&Token>) -> Result<Bytes, CommandError> {
+fn string_token_as_bytes(token: Option<&Token>) -> Result<Blob, CommandError> {
     match token {
         Some(Token::SimpleString(s)) => Ok(s.bytes().collect::<Vec<u8>>().into()),
         Some(Token::BulkString(Some(s))) => Ok(s.clone().into()),
