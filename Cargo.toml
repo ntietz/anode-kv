@@ -8,6 +8,9 @@ edition = "2021"
 [profile.bench]
 opt-level = 3
 
+[profile.release]
+debug = 1
+
 [dependencies]
 
 # error tracking is cool
