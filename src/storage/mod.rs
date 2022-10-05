@@ -69,12 +69,8 @@ impl InMemoryStorage {
                 Ok(None)
             }
             StorageCommand::Get(key) => Ok(self.data.get(&key).cloned()),
-            StorageCommand::Incr(key) => {
-                self.handle_add(key, 1).await
-            }
-            StorageCommand::Decr(key) => {
-                self.handle_add(key, -1).await
-            }
+            StorageCommand::Incr(key) => self.handle_add(key, 1).await,
+            StorageCommand::Decr(key) => self.handle_add(key, -1).await,
         }
     }
 
