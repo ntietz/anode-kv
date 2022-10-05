@@ -70,41 +70,37 @@ impl InMemoryStorage {
             }
             StorageCommand::Get(key) => Ok(self.data.get(&key).cloned()),
             StorageCommand::Incr(key) => {
-                let entry = self.data.entry(key).or_insert(Value::Int(0));
-                match entry {
-                    Value::Int(i) => {
-                        *i += 1;
-                        return Ok(Some(Value::Int(*i)));
-                    }
-                    Value::Blob(Blob(b)) => match atoi::atoi::<i64>(b) {
-                        None => {
-                            return Err(StorageError::NotAnInteger);
-                        }
-                        Some(i) => {
-                            *entry = Value::Int(i + 1);
-                            return Ok(Some(entry.clone()));
-                        }
-                    },
-                }
+                self.handle_add(key, 1).await
             }
             StorageCommand::Decr(key) => {
-                let entry = self.data.entry(key).or_insert(Value::Int(0));
-                match entry {
-                    Value::Int(i) => {
-                        *i -= 1;
-                        return Ok(Some(Value::Int(*i)));
-                    }
-                    Value::Blob(Blob(b)) => match atoi::atoi::<i64>(b) {
-                        None => {
-                            return Err(StorageError::NotAnInteger);
-                        }
-                        Some(i) => {
-                            *entry = Value::Int(i - 1);
-                            return Ok(Some(entry.clone()));
-                        }
-                    },
-                }
+                self.handle_add(key, -1).await
             }
         }
+    }
+
+    async fn handle_add(&mut self, key: Key, amount: i64) -> Result<Option<Value>, StorageError> {
+        let entry = self.data.entry(key).or_insert(Value::Int(0));
+        match entry {
+            Value::Int(i) => {
+                *i = safe_add(*i, amount)?;
+                return Ok(Some(Value::Int(*i)));
+            }
+            Value::Blob(Blob(b)) => match atoi::atoi::<i64>(b) {
+                None => {
+                    return Err(StorageError::NotAnInteger);
+                }
+                Some(i) => {
+                    *entry = Value::Int(safe_add(i, amount)?);
+                    return Ok(Some(entry.clone()));
+                }
+            },
+        }
+    }
+}
+
+fn safe_add(a: i64, b: i64) -> Result<i64, StorageError> {
+    match a.checked_add(b) {
+        Some(c) => Ok(c),
+        None => Err(StorageError::Overflow),
     }
 }
