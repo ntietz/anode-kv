@@ -21,14 +21,8 @@ pub enum StorageError {
     #[error("not an integer")]
     NotAnInteger,
 
-    #[error("unknown reason")]
-    Failed(std::io::Error),
-}
-
-impl From<std::io::Error> for StorageError {
-    fn from(err: std::io::Error) -> StorageError {
-        StorageError::Failed(err)
-    }
+    #[error("unknown reason: {0}")]
+    Failed(#[from] std::io::Error),
 }
 
 pub struct InMemoryStorage {

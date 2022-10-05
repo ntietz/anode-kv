@@ -32,14 +32,8 @@ pub enum ReadError {
     #[error("insufficient bytes")]
     InsufficientBytes(std::io::Error),
 
-    #[error("unknown reason")]
-    Failed(std::io::Error),
-}
-
-impl From<std::io::Error> for ReadError {
-    fn from(err: std::io::Error) -> ReadError {
-        ReadError::Failed(err)
-    }
+    #[error("unknown reason: {0}")]
+    Failed(#[from] std::io::Error),
 }
 
 #[derive(Error, Debug)]
