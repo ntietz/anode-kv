@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
@@ -12,6 +13,24 @@ pub enum StorageCommand {
     Decr(Key),
 }
 
+#[derive(Error, Debug)]
+pub enum StorageError {
+    #[error("integer overflow")]
+    Overflow,
+
+    #[error("not an integer")]
+    NotAnInteger,
+
+    #[error("unknown reason")]
+    Failed(std::io::Error),
+}
+
+impl From<std::io::Error> for StorageError {
+    fn from(err: std::io::Error) -> StorageError {
+        StorageError::Failed(err)
+    }
+}
+
 pub struct InMemoryStorage {
     data: HashMap<Key, Value>,
     recv_queue: StorageRecvQueue,
@@ -19,11 +38,11 @@ pub struct InMemoryStorage {
 
 pub type StorageRecvQueue = mpsc::Receiver<(
     StorageCommand,
-    oneshot::Sender<Result<Option<Value>, std::io::Error>>,
+    oneshot::Sender<Result<Option<Value>, StorageError>>,
 )>;
 pub type StorageSendQueue = mpsc::Sender<(
     StorageCommand,
-    oneshot::Sender<Result<Option<Value>, std::io::Error>>,
+    oneshot::Sender<Result<Option<Value>, StorageError>>,
 )>;
 
 impl InMemoryStorage {
@@ -43,10 +62,7 @@ impl InMemoryStorage {
         }
     }
 
-    pub async fn handle_cmd(
-        &mut self,
-        cmd: StorageCommand,
-    ) -> Result<Option<Value>, std::io::Error> {
+    pub async fn handle_cmd(&mut self, cmd: StorageCommand) -> Result<Option<Value>, StorageError> {
         match cmd {
             StorageCommand::Set(key, value) => {
                 self.data.insert(key, value);
@@ -62,10 +78,7 @@ impl InMemoryStorage {
                     }
                     Value::Blob(Blob(b)) => match atoi::atoi::<i64>(b) {
                         None => {
-                            return Err(std::io::Error::new(
-                                std::io::ErrorKind::Other,
-                                "not an integer",
-                            ));
+                            return Err(StorageError::NotAnInteger);
                         }
                         Some(i) => {
                             *entry = Value::Int(i + 1);
@@ -83,10 +96,7 @@ impl InMemoryStorage {
                     }
                     Value::Blob(Blob(b)) => match atoi::atoi::<i64>(b) {
                         None => {
-                            return Err(std::io::Error::new(
-                                std::io::ErrorKind::Other,
-                                "not an integer",
-                            ));
+                            return Err(StorageError::NotAnInteger);
                         }
                         Some(i) => {
                             *entry = Value::Int(i - 1);
@@ -95,7 +105,6 @@ impl InMemoryStorage {
                     },
                 }
             }
-
         }
     }
 }

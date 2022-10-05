@@ -4,7 +4,7 @@ use tokio::sync::oneshot;
 
 use crate::codec::Token;
 use crate::server::Context;
-use crate::storage::StorageCommand;
+use crate::storage::{StorageCommand, StorageError};
 use crate::types::{Blob, Value};
 
 mod types;
@@ -46,87 +46,69 @@ impl CommandProcessor {
                 ExecutionResult(vec![Token::BulkString(Some("ECHO".bytes().collect()))])
             }
             Command::Get(key) => {
-                let cmd = StorageCommand::Get(key.clone());
-                let (tx, rx) = oneshot::channel();
-                let res = self
-                    .context
-                    .storage_queue
-                    .send_timeout((cmd, tx), Duration::from_millis(1_000))
-                    .await;
-
-                if res.is_err() {
-                    return "timeout while sending to storage".into();
-                }
-
-                match rx.await {
+                self.execute_command_helper(StorageCommand::Get(key.clone()), |res| match res {
                     Ok(Ok(None)) => ExecutionResult(vec![Token::BulkString(None)]),
                     Ok(Ok(Some(value))) => ExecutionResult(value_to_tokens(value)),
                     Ok(Err(_)) => "internal storage error".into(),
                     Err(_) => "no response from storage".into(),
-                }
+                })
+                .await
             }
             Command::Set(key, value) => {
-                let cmd = StorageCommand::Set(key.clone(), Value::Blob(value.clone()));
-                let (tx, rx) = oneshot::channel();
-                let res = self
-                    .context
-                    .storage_queue
-                    .send_timeout((cmd, tx), Duration::from_millis(1_000))
-                    .await;
-
-                if res.is_err() {
-                    return "timeout while sending to storage".into();
-                }
-
-                match rx.await {
-                    Ok(Ok(None)) => ExecutionResult(vec![Token::SimpleString("OK".to_string())]),
-                    Ok(Ok(Some(value))) => ExecutionResult(value_to_tokens(value)),
-                    Ok(Err(_)) => "internal storage error".into(),
-                    Err(_) => "no response from storage".into(),
-                }
+                self.execute_command_helper(
+                    StorageCommand::Set(key.clone(), Value::Blob(value.clone())),
+                    |res| match res {
+                        Ok(Ok(None)) => {
+                            ExecutionResult(vec![Token::SimpleString("OK".to_string())])
+                        }
+                        Ok(Ok(Some(value))) => ExecutionResult(value_to_tokens(value)),
+                        Ok(Err(_)) => "internal storage error".into(),
+                        Err(_) => "no response from storage".into(),
+                    },
+                )
+                .await
             }
             Command::Incr(key) => {
-                let cmd = StorageCommand::Incr(key.clone());
-                let (tx, rx) = oneshot::channel();
-                let res = self
-                    .context
-                    .storage_queue
-                    .send_timeout((cmd, tx), Duration::from_millis(1_000))
-                    .await;
-
-                if res.is_err() {
-                    return "timeout while sending to storage".into();
-                }
-
-                match rx.await {
+                self.execute_command_helper(StorageCommand::Incr(key.clone()), |res| match res {
                     Ok(Ok(Some(value))) => ExecutionResult(value_to_tokens(value)),
                     Ok(Ok(None)) => "invalid response from storage".into(),
-                    Ok(Err(_)) => "internal storage error".into(),
+                    Ok(Err(err)) => storage_error_to_string(err).into(),
                     Err(_) => "no response from storage".into(),
-                }
+                })
+                .await
             }
             Command::Decr(key) => {
-                let cmd = StorageCommand::Decr(key.clone());
-                let (tx, rx) = oneshot::channel();
-                let res = self
-                    .context
-                    .storage_queue
-                    .send_timeout((cmd, tx), Duration::from_millis(1_000))
-                    .await;
-
-                if res.is_err() {
-                    return "timeout while sending to storage".into();
-                }
-
-                match rx.await {
+                self.execute_command_helper(StorageCommand::Decr(key.clone()), |res| match res {
                     Ok(Ok(Some(value))) => ExecutionResult(value_to_tokens(value)),
                     Ok(Ok(None)) => "invalid response from storage".into(),
-                    Ok(Err(_)) => "internal storage error".into(),
+                    Ok(Err(err)) => storage_error_to_string(err).into(),
                     Err(_) => "no response from storage".into(),
-                }
+                })
+                .await
             }
             Command::Unknown(cmd) => return format!("{} is not implemented :(", cmd).into(),
         }
+    }
+
+    async fn execute_command_helper(
+        &self,
+        cmd: StorageCommand,
+        f: impl FnOnce(
+            Result<Result<Option<Value>, StorageError>, tokio::sync::oneshot::error::RecvError>,
+        ) -> ExecutionResult,
+    ) -> ExecutionResult {
+        let (tx, rx) = oneshot::channel();
+        let res = self
+            .context
+            .storage_queue
+            .send_timeout((cmd, tx), Duration::from_millis(1_000))
+            .await;
+
+        if res.is_err() {
+            return "timeout while sending to storage".into();
+        }
+
+        f(rx.await)
     }
 }
 
@@ -137,6 +119,16 @@ fn value_to_tokens(value: Value) -> Vec<Token> {
             let b = i.to_string().into_bytes();
             vec![Blob(b).into()]
         }
+    }
+}
+
+fn storage_error_to_string(error: StorageError) -> &'static str {
+    match error {
+        StorageError::NotAnInteger => {
+            "WRONGTYPE Operation against a key holding the wrong kind of value"
+        }
+        StorageError::Overflow => "ERR increment or decrement would overflow",
+        StorageError::Failed(_) => "ERR unknown storage failure",
     }
 }
 

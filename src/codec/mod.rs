@@ -26,9 +26,6 @@ pub enum ReadError {
     #[error("not implemented")]
     NotImplemented,
 
-    #[error("incomplete read")]
-    Incomplete,
-
     #[error("malformed input")]
     Malformed(&'static str),
 
