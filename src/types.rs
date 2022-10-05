@@ -1,3 +1,4 @@
+//use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Error, Formatter};
 
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -10,7 +11,20 @@ impl From<Vec<u8>> for Blob {
 }
 
 pub type Key = Blob;
-pub type Value = Blob;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Value {
+    Blob(Blob),
+    //Set(HashSet<Blob>),
+    //Hash(HashMap<Blob,Blob>),
+    Int(i64),
+}
+
+impl From<Vec<u8>> for Value {
+    fn from(t: Vec<u8>) -> Self {
+        Value::Blob(t.into())
+    }
+}
 
 impl Debug for Blob {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {

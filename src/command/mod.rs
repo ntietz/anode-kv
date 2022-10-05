@@ -5,6 +5,7 @@ use tokio::sync::oneshot;
 use crate::codec::Token;
 use crate::server::Context;
 use crate::storage::StorageCommand;
+use crate::types::{Blob, Value};
 
 mod types;
 pub use types::{Command, CommandError};
@@ -59,13 +60,13 @@ impl CommandProcessor {
 
                 match rx.await {
                     Ok(Ok(None)) => ExecutionResult(vec![Token::BulkString(None)]),
-                    Ok(Ok(Some(value))) => ExecutionResult(vec![value.into()]),
+                    Ok(Ok(Some(value))) => ExecutionResult(value_to_tokens(value)),
                     Ok(Err(_)) => "internal storage error".into(),
                     Err(_) => "no response from storage".into(),
                 }
             }
             Command::Set(key, value) => {
-                let cmd = StorageCommand::Set(key.clone(), value.clone());
+                let cmd = StorageCommand::Set(key.clone(), Value::Blob(value.clone()));
                 let (tx, rx) = oneshot::channel();
                 let res = self
                     .context
@@ -79,22 +80,62 @@ impl CommandProcessor {
 
                 match rx.await {
                     Ok(Ok(None)) => ExecutionResult(vec![Token::SimpleString("OK".to_string())]),
-                    Ok(Ok(Some(value))) => ExecutionResult(vec![value.into()]),
+                    Ok(Ok(Some(value))) => ExecutionResult(value_to_tokens(value)),
                     Ok(Err(_)) => "internal storage error".into(),
                     Err(_) => "no response from storage".into(),
                 }
             }
-            Command::Decr(_key) => {
-                // TODO
-                return format!("DECR is not implemented yet").into()
+            Command::Incr(key) => {
+                let cmd = StorageCommand::Incr(key.clone());
+                let (tx, rx) = oneshot::channel();
+                let res = self
+                    .context
+                    .storage_queue
+                    .send_timeout((cmd, tx), Duration::from_millis(1_000))
+                    .await;
+
+                if res.is_err() {
+                    return "timeout while sending to storage".into();
+                }
+
+                match rx.await {
+                    Ok(Ok(Some(value))) => ExecutionResult(value_to_tokens(value)),
+                    Ok(Ok(None)) => "invalid response from storage".into(),
+                    Ok(Err(_)) => "internal storage error".into(),
+                    Err(_) => "no response from storage".into(),
+                }
             }
-            Command::Incr(_key) => {
-                // TODO
-                return format!("INCR is not implemented yet").into()
+            Command::Decr(key) => {
+                let cmd = StorageCommand::Decr(key.clone());
+                let (tx, rx) = oneshot::channel();
+                let res = self
+                    .context
+                    .storage_queue
+                    .send_timeout((cmd, tx), Duration::from_millis(1_000))
+                    .await;
+
+                if res.is_err() {
+                    return "timeout while sending to storage".into();
+                }
+
+                match rx.await {
+                    Ok(Ok(Some(value))) => ExecutionResult(value_to_tokens(value)),
+                    Ok(Ok(None)) => "invalid response from storage".into(),
+                    Ok(Err(_)) => "internal storage error".into(),
+                    Err(_) => "no response from storage".into(),
+                }
             }
-            Command::Unknown(cmd) => {
-                return format!("{} is not implemented", cmd).into()
-            }
+            Command::Unknown(cmd) => return format!("{} is not implemented :(", cmd).into(),
+        }
+    }
+}
+
+fn value_to_tokens(value: Value) -> Vec<Token> {
+    match value {
+        Value::Blob(b) => vec![b.into()],
+        Value::Int(i) => {
+            let b = i.to_string().into_bytes();
+            vec![Blob(b).into()]
         }
     }
 }

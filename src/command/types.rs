@@ -1,16 +1,16 @@
 use thiserror::Error;
 
 use crate::codec::Token;
-use crate::types::{Blob, Key, Value};
+use crate::types::{Blob, Key};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Command {
-    Echo(Value),
+    Echo(Blob),
 
     Command,
 
     Get(Key),
-    Set(Key, Value),
+    Set(Key, Blob),
 
     Decr(Key),
     Incr(Key),
@@ -58,6 +58,18 @@ impl Command {
 
                 Ok((Command::Set(key, value), SET_LENGTH + 1))
             }
+            "INCR" => {
+                validate_length(length, INCR_LENGTH)?;
+                let key = string_token_as_bytes(tokens.get(2))?;
+
+                Ok((Command::Incr(key), length + 1))
+            }
+            "DECR" => {
+                validate_length(length, DECR_LENGTH)?;
+                let key = string_token_as_bytes(tokens.get(2))?;
+
+                Ok((Command::Decr(key), length + 1))
+            }
             unk => Ok((Command::Unknown(unk.to_string()), length + 1)),
         }
     }
@@ -67,6 +79,8 @@ const ECHO_LENGTH: usize = 2;
 const COMMAND_LENGTH: usize = 1;
 const GET_LENGTH: usize = 2;
 const SET_LENGTH: usize = 3;
+const INCR_LENGTH: usize = 2;
+const DECR_LENGTH: usize = 2;
 
 fn get_command(tokens: &[Token]) -> Result<(usize, String), CommandError> {
     let length = match tokens.get(0) {
