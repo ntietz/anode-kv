@@ -14,6 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+            toolchain: nightly
+            components: clippy
+            override: true
       - name: Build
         run: cargo build --verbose
       - name: Run tests
@@ -21,9 +26,15 @@ jobs:
       
   linting:
     runs-on: ubuntu-latest
+    permissions:
+      checks: write
     steps:
       - uses: actions/checkout@v3
-      - run: rustup component add clippy
+      - uses: actions-rs/toolchain@v1
+        with:
+            toolchain: nightly
+            components: clippy
+            override: true
       - name: Run clippy
         uses: actions-rs/clippy-check@v1
         with:
@@ -34,4 +45,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+            toolchain: nightly
+            components: clippy
+            override: true
+      - run: rustup component add rustfmt --toolchain nightly-x86_64-unknown-linux-gnu
       - run: cargo fmt --check
