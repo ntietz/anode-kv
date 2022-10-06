@@ -73,15 +73,13 @@ impl InMemoryStorage {
         match entry {
             Value::Int(i) => {
                 *i = safe_add(*i, amount)?;
-                return Ok(Some(Value::Int(*i)));
+                Ok(Some(Value::Int(*i)))
             }
             Value::Blob(Blob(b)) => match atoi::atoi::<i64>(b) {
-                None => {
-                    return Err(StorageError::NotAnInteger);
-                }
+                None => Err(StorageError::NotAnInteger),
                 Some(i) => {
                     *entry = Value::Int(safe_add(i, amount)?);
-                    return Ok(Some(entry.clone()));
+                    Ok(Some(entry.clone()))
                 }
             },
         }
