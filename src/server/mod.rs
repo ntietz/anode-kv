@@ -7,8 +7,6 @@ use tokio::sync::Mutex;
 use crate::connection::ConnectionManager;
 use crate::storage::{InMemoryStorage, StorageSendQueue};
 
-// TODO: custom type that is wraps Vec<u8> and debug prints utf-8 string if possible, else bytes
-
 pub struct Server {
     listener: TcpListener,
     connection_manager: ConnectionManager,

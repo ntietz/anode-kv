@@ -2,7 +2,7 @@ use std::io::{Read, Write};
 
 use thiserror::Error;
 
-use crate::types::Bytes;
+use crate::types::Blob;
 
 pub const CRLF: &str = "\r\n";
 
@@ -15,8 +15,8 @@ pub enum Token {
     Array(i64),
 }
 
-impl From<Bytes> for Token {
-    fn from(b: Bytes) -> Self {
+impl From<Blob> for Token {
+    fn from(b: Blob) -> Self {
         Token::BulkString(Some(b.0))
     }
 }
@@ -26,23 +26,14 @@ pub enum ReadError {
     #[error("not implemented")]
     NotImplemented,
 
-    #[error("incomplete read")]
-    Incomplete,
-
     #[error("malformed input")]
     Malformed(&'static str),
 
     #[error("insufficient bytes")]
     InsufficientBytes(std::io::Error),
 
-    #[error("unknown reason")]
-    Failed(std::io::Error),
-}
-
-impl From<std::io::Error> for ReadError {
-    fn from(err: std::io::Error) -> ReadError {
-        ReadError::Failed(err)
-    }
+    #[error("unknown reason: {0}")]
+    Failed(#[from] std::io::Error),
 }
 
 #[derive(Error, Debug)]
