@@ -86,7 +86,7 @@ impl CommandProcessor {
                 })
                 .await
             }
-            Command::Unknown(cmd) => return format!("{} is not implemented :(", cmd).into(),
+            Command::Unknown(cmd) => format!("{} is not implemented", cmd).into(),
         }
     }
 
