@@ -13,6 +13,9 @@ debug = 1
 
 [dependencies]
 
+# let's not reimplement integer parsing
+atoi = "1.0.0"
+
 # error tracking is cool
 thiserror = "1.0.35"
 
