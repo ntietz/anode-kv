@@ -6,6 +6,8 @@ use tokio::sync::oneshot;
 
 use crate::types::{Blob, Key, Value};
 
+mod transaction_log;
+
 pub enum StorageCommand {
     Set(Key, Value),
     Get(Key),
