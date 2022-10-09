@@ -10,13 +10,13 @@ pub enum TransactionLogError {
 
 
 pub trait TransactionLog {
-    type Iter: Iterator<Item=StorageCommand>;
+    type Iterable: IntoIterator<Item=StorageCommand>;
 
     fn record(&self, cmd: StorageCommand) -> Result<(), TransactionLogError>;
     fn compact(&self) -> Result<(), TransactionLogError>;
-    fn fsync(&self) -> Result<(), TransactionLogError>;
+    //fn fsync(&self) -> Result<(), TransactionLogError>;
 
-    fn read(&self) -> Self::Iter;
+    fn read(&self) -> Self::Iterable;
 }
 
 struct NaiveFileBackedTransactionLog {
@@ -41,7 +41,7 @@ impl NaiveFileBackedTransactionLog {
 }
 
 impl TransactionLog for NaiveFileBackedTransactionLog {
-    type Iter = Vec<StorageCommand>::Iter<Item=StorageCommand>;
+    type Iterable = Vec<StorageCommand>;
 
     fn record(&self, cmd: StorageCommand) -> Result<(), TransactionLogError> {
         Err(TransactionLogError::NotImplemented)
@@ -56,9 +56,9 @@ impl TransactionLog for NaiveFileBackedTransactionLog {
         Err(TransactionLogError::NotImplemented)
     }
 
-    fn read(&self) -> Self::Iter {
+    fn read(&self) -> Self::Iterable {
         let items: Vec<StorageCommand> = vec![];
-        items.iter()
+        items
     }
 }
 
