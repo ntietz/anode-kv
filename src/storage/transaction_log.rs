@@ -1,5 +1,5 @@
 use std::fs::{File, OpenOptions};
-use std::io::{BufReader, BufRead, Write};
+use std::io::{BufRead, BufReader, Write};
 use std::sync::{Arc, Mutex};
 
 use thiserror::Error;
@@ -15,9 +15,8 @@ pub enum TransactionLogError {
     Failed(#[from] std::io::Error),
 }
 
-
 pub trait TransactionLog {
-    type Iterable: IntoIterator<Item=StorageCommand>;
+    type Iterable: IntoIterator<Item = StorageCommand>;
 
     fn record(&self, cmd: StorageCommand) -> Result<(), TransactionLogError>;
     fn compact(&self) -> Result<(), TransactionLogError>;
@@ -30,7 +29,6 @@ pub struct NaiveFileBackedTransactionLog {
     // current new writes
     // snapshot
     // <- new new writes
-
     current_log: Arc<Mutex<File>>,
     //base: String,
 }
@@ -39,7 +37,12 @@ impl NaiveFileBackedTransactionLog {
     pub fn new(base: &str) -> Result<Self, TransactionLogError> {
         let log_filename = current_log_filename(base);
         println!("log: {}", log_filename);
-        let current_log = OpenOptions::new().create(true).read(true).write(true).append(true).open(&log_filename)?;
+        let current_log = OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .append(true)
+            .open(&log_filename)?;
         let current_log = Arc::new(Mutex::new(current_log));
 
         Ok(NaiveFileBackedTransactionLog {
@@ -47,7 +50,6 @@ impl NaiveFileBackedTransactionLog {
             current_log,
         })
     }
-
 }
 
 fn current_log_filename(base: &str) -> String {
@@ -87,11 +89,13 @@ impl TransactionLog for NaiveFileBackedTransactionLog {
 
         let lines = reader.lines();
 
-        let result_iter: Result<Vec<_>, _> = lines.map(|line| -> Result<StorageCommand, TransactionLogError> {
-            let line = line?;
-            let parsed_line = serde_json::from_str(&line)?;
-            Ok(parsed_line)
-        }).collect();
+        let result_iter: Result<Vec<_>, _> = lines
+            .map(|line| -> Result<StorageCommand, TransactionLogError> {
+                let line = line?;
+                let parsed_line = serde_json::from_str(&line)?;
+                Ok(parsed_line)
+            })
+            .collect();
         let iter = result_iter?;
 
         Ok(iter)
@@ -119,7 +123,8 @@ mod tests {
             naive_log.record(cmd).expect("should record command");
         }
 
-        let content = std::fs::read_to_string(current_log_filename(&base_path)).expect("should read the file");
+        let content = std::fs::read_to_string(current_log_filename(&base_path))
+            .expect("should read the file");
 
         let expected_log = "{\"Set\":[[97],{\"Blob\":[49]}]}\n{\"Incr\":[97]}\n".to_string();
         assert_eq!(expected_log, content);
@@ -140,7 +145,9 @@ mod tests {
 
         let naive_log = NaiveFileBackedTransactionLog::new(&base_path).expect("should create log");
         for cmd in &commands {
-            naive_log.record(cmd.clone()).expect("should record command");
+            naive_log
+                .record(cmd.clone())
+                .expect("should record command");
         }
 
         let read_log = NaiveFileBackedTransactionLog::new(&base_path).expect("should create log");
@@ -163,5 +170,4 @@ mod tests {
             Ok(_) => println!("cleaning up after someone else"),
         }
     }
-
 }

@@ -1,7 +1,7 @@
 //use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Error, Formatter};
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct Blob(pub Vec<u8>);

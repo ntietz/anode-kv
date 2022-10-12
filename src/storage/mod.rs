@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
@@ -8,7 +8,7 @@ use tokio::sync::oneshot;
 use crate::types::{Blob, Key, Value};
 
 mod transaction_log;
-pub use transaction_log::{TransactionLog, NaiveFileBackedTransactionLog};
+pub use transaction_log::{NaiveFileBackedTransactionLog, TransactionLog};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum StorageCommand {
