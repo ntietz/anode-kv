@@ -1,7 +1,9 @@
 //use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Error, Formatter};
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+use serde::{Serialize, Deserialize};
+
+#[derive(Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct Blob(pub Vec<u8>);
 
 impl From<Vec<u8>> for Blob {
@@ -12,7 +14,7 @@ impl From<Vec<u8>> for Blob {
 
 pub type Key = Blob;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Value {
     Blob(Blob),
     //Set(HashSet<Blob>),
