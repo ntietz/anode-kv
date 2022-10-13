@@ -5,12 +5,12 @@ use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 
 use crate::connection::ConnectionManager;
-use crate::storage::{InMemoryStorage, StorageSendQueue};
+use crate::storage::{InMemoryStorage, StorageSendQueue, NaiveFileBackedTransactionLog};
 
 pub struct Server {
     listener: TcpListener,
     connection_manager: ConnectionManager,
-    storage: Arc<Mutex<InMemoryStorage>>,
+    storage: Arc<Mutex<InMemoryStorage<NaiveFileBackedTransactionLog>>>,
     context: Context,
 }
 
@@ -35,7 +35,7 @@ impl Server {
         // based on hardware and use cases.
         let (tx, rx) = mpsc::channel(10);
 
-        let storage = Arc::new(Mutex::new(InMemoryStorage::new(rx)));
+        let storage = Arc::new(Mutex::new(InMemoryStorage::from_log(rx).await));
         let context = Context::new(tx);
 
         Ok(Server {

@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
 use super::StorageCommand;
+use crate::types::Value;
 
 #[derive(Error, Debug)]
 pub enum TransactionLogError {
@@ -18,7 +19,9 @@ pub enum TransactionLogError {
 pub trait TransactionLog {
     type Iterable: IntoIterator<Item = StorageCommand>;
 
-    fn record(&self, cmd: StorageCommand) -> Result<(), TransactionLogError>;
+    fn record(&self, cmd: &StorageCommand) -> Result<(), TransactionLogError>;
+    // TODO: batch.
+    //fn record_batch(&self, cmd: &[StorageCommand]) -> Result<(), TransactionLogError>;
     fn compact(&self) -> Result<(), TransactionLogError>;
     fn fsync(&self) -> Result<(), TransactionLogError>;
 
@@ -59,12 +62,38 @@ fn current_log_filename(base: &str) -> String {
 impl TransactionLog for NaiveFileBackedTransactionLog {
     type Iterable = Vec<StorageCommand>;
 
-    fn record(&self, cmd: StorageCommand) -> Result<(), TransactionLogError> {
-        let serialized = serde_json::to_string(&cmd)?;
-
+    fn record(&self, cmd: &StorageCommand) -> Result<(), TransactionLogError> {
         {
             let mut log = self.current_log.lock().unwrap();
-            writeln!(log, "{}", serialized)?;
+            match cmd {
+                StorageCommand::Incr(key) => {
+                    log.write(b"I")?;
+                    log.write(&key.0.len().to_ne_bytes()[..])?;
+                    log.write(&key.0[..])?;
+                },
+                StorageCommand::Decr(key) => {
+                    log.write(b"D")?;
+                    log.write(&key.0.len().to_ne_bytes()[..])?;
+                    log.write(&key.0[..])?;
+                },
+                StorageCommand::Set(key, value) => {
+                    log.write(b"S")?;
+                    log.write(&key.0.len().to_ne_bytes()[..])?;
+                    log.write(&key.0[..])?;
+                    match value {
+                        Value::Int(i) => {
+                            log.write(b"I")?;
+                            log.write(&i.to_ne_bytes()[..])?;
+                        },
+                        Value::Blob(b) => {
+                            log.write(b"B")?;
+                            log.write(&b.0.len().to_ne_bytes()[..])?;
+                            log.write(&b.0[..])?;
+                        },
+                    }
+                },
+                _ => {},
+            };
         }
 
         Ok(())
@@ -83,6 +112,7 @@ impl TransactionLog for NaiveFileBackedTransactionLog {
         todo!("not implemented")
     }
 
+    // TODO: read the custom binary protocol
     fn read(&self) -> Result<Self::Iterable, TransactionLogError> {
         let log = self.current_log.lock().unwrap().try_clone()?;
         let reader = BufReader::new(log);
@@ -120,7 +150,7 @@ mod tests {
 
         let naive_log = NaiveFileBackedTransactionLog::new(&base_path).expect("should create log");
         for cmd in commands {
-            naive_log.record(cmd).expect("should record command");
+            naive_log.record(&cmd).expect("should record command");
         }
 
         let content = std::fs::read_to_string(current_log_filename(&base_path))
@@ -146,7 +176,7 @@ mod tests {
         let naive_log = NaiveFileBackedTransactionLog::new(&base_path).expect("should create log");
         for cmd in &commands {
             naive_log
-                .record(cmd.clone())
+                .record(&cmd)
                 .expect("should record command");
         }
 

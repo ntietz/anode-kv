@@ -140,6 +140,7 @@ fn storage_error_to_string(error: StorageError) -> &'static str {
             "WRONGTYPE Operation against a key holding the wrong kind of value"
         }
         StorageError::Overflow => "ERR increment or decrement would overflow",
+        StorageError::LogError(_) => "ERR failure while recording storage operation",
         StorageError::Failed(_) => "ERR unknown storage failure",
     }
 }
