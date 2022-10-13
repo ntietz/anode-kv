@@ -7,8 +7,7 @@ use tokio::sync::oneshot;
 
 use crate::types::{Blob, Key, Value};
 
-mod transaction_log;
-pub use transaction_log::{NaiveFileBackedTransactionLog, TransactionLog, TransactionLogError};
+pub use crate::transaction::{TransactionLog, TransactionLogError};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum StorageCommand {
@@ -33,10 +32,10 @@ pub enum StorageError {
     Failed(#[from] std::io::Error),
 }
 
-pub struct InMemoryStorage<L: TransactionLog> {
+pub struct InMemoryStorage {
     data: HashMap<Key, Value>,
     recv_queue: StorageRecvQueue,
-    log: L,
+    log: TransactionLog,
     durable: bool,
 }
 
@@ -49,13 +48,19 @@ pub type StorageSendQueue = mpsc::Sender<(
     oneshot::Sender<Result<Option<Value>, StorageError>>,
 )>;
 
-impl InMemoryStorage<NaiveFileBackedTransactionLog> {
+impl InMemoryStorage {
     pub fn new(recv_queue: StorageRecvQueue) -> Self {
         let data = HashMap::new();
         // TODO: pass this in instead
-        let log = NaiveFileBackedTransactionLog::new("log").expect("creating transaction log shold not fail");
+        let log = TransactionLog::new("log")
+            .expect("creating transaction log shold not fail");
 
-        Self { data, recv_queue, log, durable: true }
+        Self {
+            data,
+            recv_queue,
+            log,
+            durable: true,
+        }
     }
 
     pub async fn from_log(recv_queue: StorageRecvQueue) -> Self {
@@ -72,7 +77,6 @@ impl InMemoryStorage<NaiveFileBackedTransactionLog> {
         println!("finished log read; {} records", count);
 
         store
-
     }
 
     pub async fn run(&mut self) {
@@ -126,7 +130,7 @@ impl InMemoryStorage<NaiveFileBackedTransactionLog> {
     fn record_cmd(&self, cmd: &StorageCommand) -> Result<(), StorageError> {
         if self.durable {
             match cmd {
-                StorageCommand::Get(_) => {},
+                StorageCommand::Get(_) => {}
                 _ => {
                     self.log.record(cmd)?;
                 }
