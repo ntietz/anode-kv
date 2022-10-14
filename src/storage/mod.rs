@@ -5,9 +5,8 @@ use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
-use crate::types::{Blob, Key, Value};
-
 pub use crate::transaction::{TransactionLog, TransactionLogError};
+use crate::types::{Blob, Key, Value};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum StorageCommand {
@@ -52,8 +51,7 @@ impl InMemoryStorage {
     pub fn new(recv_queue: StorageRecvQueue) -> Self {
         let data = HashMap::new();
         // TODO: pass this in instead
-        let log = TransactionLog::new("log")
-            .expect("creating transaction log shold not fail");
+        let log = TransactionLog::new("log").expect("creating transaction log shold not fail");
 
         Self {
             data,

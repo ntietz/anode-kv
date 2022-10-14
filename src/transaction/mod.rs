@@ -40,28 +40,28 @@ impl TransactionLog {
         let mut log = self.current_log.lock().unwrap();
         match cmd {
             StorageCommand::Incr(key) => {
-                log.write(b"I")?;
-                log.write(&key.0.len().to_le_bytes()[..])?;
-                log.write(&key.0[..])?;
+                log.write_all(b"I")?;
+                log.write_all(&key.0.len().to_le_bytes()[..])?;
+                log.write_all(&key.0[..])?;
             }
             StorageCommand::Decr(key) => {
-                log.write(b"D")?;
-                log.write(&key.0.len().to_le_bytes()[..])?;
-                log.write(&key.0[..])?;
+                log.write_all(b"D")?;
+                log.write_all(&key.0.len().to_le_bytes()[..])?;
+                log.write_all(&key.0[..])?;
             }
             StorageCommand::Set(key, value) => {
-                log.write(b"S")?;
-                log.write(&key.0.len().to_le_bytes()[..])?;
-                log.write(&key.0[..])?;
+                log.write_all(b"S")?;
+                log.write_all(&key.0.len().to_le_bytes()[..])?;
+                log.write_all(&key.0[..])?;
                 match value {
                     Value::Int(i) => {
-                        log.write(b"I")?;
-                        log.write(&i.to_le_bytes()[..])?;
+                        log.write_all(b"I")?;
+                        log.write_all(&i.to_le_bytes()[..])?;
                     }
                     Value::Blob(b) => {
-                        log.write(b"B")?;
-                        log.write(&b.0.len().to_le_bytes()[..])?;
-                        log.write(&b.0[..])?;
+                        log.write_all(b"B")?;
+                        log.write_all(&b.0.len().to_le_bytes()[..])?;
+                        log.write_all(&b.0[..])?;
                     }
                 }
             }

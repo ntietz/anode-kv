@@ -35,7 +35,7 @@ impl Server {
         // based on hardware and use cases.
         let (tx, rx) = mpsc::channel(10);
 
-        let storage = Arc::new(Mutex::new(InMemoryStorage::from_log(rx).await));
+        let storage = Arc::new(Mutex::new(InMemoryStorage::new(rx)));
         let context = Context::new(tx);
 
         Ok(Server {
