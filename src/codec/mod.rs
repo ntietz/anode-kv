@@ -178,10 +178,10 @@ fn read_integer<T: Read>(s: &mut T) -> Result<i64, ReadError> {
             let digit = (buf[0] - b'0') as i64;
             val = val
                 .checked_mul(10)
-                .ok_or(ReadError::Malformed("overflowed i64"))?;
+                .ok_or_else(|| ReadError::Malformed("overflowed i64"))?;
             val = val
                 .checked_add(digit)
-                .ok_or(ReadError::Malformed("overflowed i64"))?;
+                .ok_or_else(|| ReadError::Malformed("overflowed i64"))?;
         }
     }
 }
