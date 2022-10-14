@@ -4,8 +4,10 @@ use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
+pub use crate::transaction::{TransactionLog, TransactionLogError};
 use crate::types::{Blob, Key, Value};
 
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum StorageCommand {
     Set(Key, Value),
     Get(Key),
@@ -21,6 +23,9 @@ pub enum StorageError {
     #[error("not an integer")]
     NotAnInteger,
 
+    #[error("transaction log error: {0}")]
+    LogError(#[from] TransactionLogError),
+
     #[error("unknown reason: {0}")]
     Failed(#[from] std::io::Error),
 }
@@ -28,6 +33,8 @@ pub enum StorageError {
 pub struct InMemoryStorage {
     data: HashMap<Key, Value>,
     recv_queue: StorageRecvQueue,
+    log: TransactionLog,
+    durable: bool,
 }
 
 pub type StorageRecvQueue = mpsc::Receiver<(
@@ -42,8 +49,31 @@ pub type StorageSendQueue = mpsc::Sender<(
 impl InMemoryStorage {
     pub fn new(recv_queue: StorageRecvQueue) -> Self {
         let data = HashMap::new();
+        // TODO: pass this in instead
+        let log = TransactionLog::new("log").expect("creating transaction log shold not fail");
 
-        Self { data, recv_queue }
+        Self {
+            data,
+            recv_queue,
+            log,
+            durable: true,
+        }
+    }
+
+    pub async fn from_log(recv_queue: StorageRecvQueue) -> Self {
+        let mut store = Self::new(recv_queue);
+
+        println!("starting log read");
+        store.disable_durability();
+        let mut count: usize = 0;
+        for cmd in store.log.read().unwrap() {
+            store.handle_cmd(cmd).await.expect("should work");
+            count += 1;
+        }
+        store.enable_durability();
+        println!("finished log read; {} records", count);
+
+        store
     }
 
     pub async fn run(&mut self) {
@@ -57,6 +87,7 @@ impl InMemoryStorage {
     }
 
     pub async fn handle_cmd(&mut self, cmd: StorageCommand) -> Result<Option<Value>, StorageError> {
+        self.record_cmd(&cmd)?;
         match cmd {
             StorageCommand::Set(key, value) => {
                 self.data.insert(key, value);
@@ -83,6 +114,26 @@ impl InMemoryStorage {
                 }
             },
         }
+    }
+
+    fn enable_durability(&mut self) {
+        self.durable = true;
+    }
+
+    fn disable_durability(&mut self) {
+        self.durable = false;
+    }
+
+    fn record_cmd(&self, cmd: &StorageCommand) -> Result<(), StorageError> {
+        if self.durable {
+            match cmd {
+                StorageCommand::Get(_) => {}
+                _ => {
+                    self.log.record(cmd)?;
+                }
+            };
+        }
+        Ok(())
     }
 }
 
