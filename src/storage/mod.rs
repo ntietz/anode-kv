@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
@@ -8,7 +7,7 @@ use tokio::sync::oneshot;
 pub use crate::transaction::{TransactionLog, TransactionLogError};
 use crate::types::{Blob, Key, Value};
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum StorageCommand {
     Set(Key, Value),
     Get(Key),

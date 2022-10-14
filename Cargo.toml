@@ -34,10 +34,6 @@ console-subscriber = "0.1.8"
 # handy for reading contiguous streams of... bytes.
 bytes = "1.2.1"
 
-# serializing and deserializing is really useful
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-
 [dev-dependencies]
 
 criterion = "0.4.0"
