@@ -43,7 +43,19 @@ impl CommandProcessor {
         match command {
             Command::Echo(t) => ExecutionResult(vec![t.clone().into()]),
             Command::Command => {
-                ExecutionResult(vec![Token::BulkString(Some("ECHO".bytes().collect()))])
+                let commands = vec![
+                    Token::BulkString(Some("ECHO".bytes().collect())),
+                    Token::BulkString(Some("COMMAND".bytes().collect())),
+                    Token::BulkString(Some("GET".bytes().collect())),
+                    Token::BulkString(Some("SET".bytes().collect())),
+                    Token::BulkString(Some("INCR".bytes().collect())),
+                    Token::BulkString(Some("DECR".bytes().collect())),
+                ];
+
+                let mut resp = vec![Token::Array(commands.len() as i64)];
+                resp.extend_from_slice(&commands[..]);
+
+                ExecutionResult(resp)
             }
             Command::Get(key) => {
                 self.execute_command_helper(StorageCommand::Get(key.clone()), |res| match res {
@@ -128,6 +140,7 @@ fn storage_error_to_string(error: StorageError) -> &'static str {
             "WRONGTYPE Operation against a key holding the wrong kind of value"
         }
         StorageError::Overflow => "ERR increment or decrement would overflow",
+        StorageError::LogError(_) => "ERR failure while recording storage operation",
         StorageError::Failed(_) => "ERR unknown storage failure",
     }
 }

@@ -17,3 +17,6 @@ Cargo.lock
 # Performance analysis artifacts
 perf.data*
 *.svg
+
+# Test data
+.tmp/
