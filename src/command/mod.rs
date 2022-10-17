@@ -150,12 +150,12 @@ mod tests {
     use tokio::sync::mpsc;
 
     use super::*;
-    use crate::types::Blob;
+    use crate::{config::Config, types::Blob};
 
     #[tokio::test]
     async fn it_echoes() {
         let (tx, _rx) = mpsc::channel(1);
-        let context = Context::new(tx);
+        let context = Context::new(tx, Config::default());
         let cp = CommandProcessor::new(context);
 
         let cmd = Command::Echo(Blob(vec![0u8, 1u8, 2u8]));

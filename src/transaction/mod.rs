@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use thiserror::Error;
 
+use crate::config::Config;
 use crate::storage::StorageCommand;
 use crate::types::{Blob, Value};
 
@@ -14,13 +15,13 @@ pub enum TransactionLogError {
 }
 
 pub struct TransactionLog {
-    base: String,
+    config: Config,
     current_log: Arc<Mutex<File>>,
 }
 
 impl TransactionLog {
-    pub fn new(base: &str) -> Result<Self, TransactionLogError> {
-        let log_filename = current_log_filename(base);
+    pub fn new(config: Config) -> Result<Self, TransactionLogError> {
+        let log_filename = current_log_filename(&config.storage_basepath);
         println!("log: {}", log_filename);
         let current_log = OpenOptions::new()
             .create(true)
@@ -31,7 +32,7 @@ impl TransactionLog {
         let current_log = Arc::new(Mutex::new(current_log));
 
         Ok(Self {
-            base: base.into(),
+            config,
             current_log,
         })
     }
@@ -83,7 +84,7 @@ impl TransactionLog {
         // while we read the log.
         let write_lock = self.current_log.lock().unwrap();
 
-        let log_filename = current_log_filename(&self.base);
+        let log_filename = current_log_filename(&self.config.storage_basepath);
         let read_log = OpenOptions::new().read(true).open(&log_filename)?;
 
         let reader = BufReader::new(read_log);
@@ -193,13 +194,14 @@ mod tests {
         setup_tmp_dir(tmp);
 
         let base_path = format!("{}/log", tmp);
+        let config = create_config(base_path.clone());
 
         let commands = vec![
             StorageCommand::Set("a".into(), "1".bytes().collect::<Vec<u8>>().into()),
             StorageCommand::Incr("a".into()),
         ];
 
-        let log = TransactionLog::new(&base_path).expect("should create log");
+        let log = TransactionLog::new(config).expect("should create log");
         for cmd in commands {
             log.record(&cmd).expect("should record command");
         }
@@ -219,18 +221,19 @@ mod tests {
         let tmp = ".tmp/tlog-test-read/";
         setup_tmp_dir(tmp);
         let base_path = format!("{}/log", tmp);
+        let config = create_config(base_path);
 
         let commands = vec![
             StorageCommand::Set("a".into(), "1".bytes().collect::<Vec<u8>>().into()),
             StorageCommand::Incr("a".into()),
         ];
 
-        let log = TransactionLog::new(&base_path).expect("should create log");
+        let log = TransactionLog::new(config.clone()).expect("should create log");
         for cmd in &commands {
             log.record(&cmd).expect("should record command");
         }
 
-        let read_log = TransactionLog::new(&base_path).expect("should create log");
+        let read_log = TransactionLog::new(config).expect("should create log");
         let recorded_commands: Vec<StorageCommand> = read_log.read().unwrap().into_iter().collect();
         assert_eq!(commands, recorded_commands);
 
@@ -249,5 +252,11 @@ mod tests {
             Err(_) => println!("yay, it was already cleaned up!"),
             Ok(_) => println!("cleaning up after someone else"),
         }
+    }
+
+    fn create_config(base_path: String) -> Config {
+        let mut config = Config::default();
+        config.storage_basepath = base_path;
+        config
     }
 }

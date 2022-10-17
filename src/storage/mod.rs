@@ -4,6 +4,7 @@ use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
+use crate::server::Context;
 pub use crate::transaction::{TransactionLog, TransactionLogError};
 use crate::types::{Blob, Key, Value};
 
@@ -47,21 +48,23 @@ pub type StorageSendQueue = mpsc::Sender<(
 )>;
 
 impl InMemoryStorage {
-    pub fn new(recv_queue: StorageRecvQueue) -> Self {
+    pub fn new(recv_queue: StorageRecvQueue, context: Context) -> Self {
         let data = HashMap::new();
         // TODO: pass this in instead
-        let log = TransactionLog::new("log").expect("creating transaction log shold not fail");
+        let log =
+            TransactionLog::new(context.config).expect("creating transaction log shold not fail");
+        let durable = true;
 
         Self {
             data,
             recv_queue,
             log,
-            durable: true,
+            durable,
         }
     }
 
-    pub async fn from_log(recv_queue: StorageRecvQueue) -> Self {
-        let mut store = Self::new(recv_queue);
+    pub async fn from_log(recv_queue: StorageRecvQueue, context: Context) -> Self {
+        let mut store = Self::new(recv_queue, context);
 
         println!("starting log read");
         store.disable_durability();
