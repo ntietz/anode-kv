@@ -63,5 +63,10 @@ async fn connect_and_request(addr: String) -> TcpStream {
 fn create_config() -> Config {
     let mut config = Config::default();
     config.address = "127.0.0.1:0".to_string();
+
+    // ensure that the tmp directory exists, since the server expects it to
+    // already be created
+    std::fs::create_dir_all("./tmp").unwrap();
+
     config
 }
