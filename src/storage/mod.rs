@@ -51,7 +51,7 @@ impl InMemoryStorage {
     pub fn new(recv_queue: StorageRecvQueue, context: Context) -> Self {
         let data = HashMap::new();
         // TODO: pass this in instead
-        let log = TransactionLog::new(context.config.clone())
+        let log = TransactionLog::new(context.config)
             .expect("creating transaction log shold not fail");
         let durable = true;
 

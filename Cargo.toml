@@ -34,6 +34,9 @@ console-subscriber = "0.1.8"
 # handy for reading contiguous streams of... bytes.
 bytes = "1.2.1"
 
+# clap if you like command line arguments
+clap = { version = "4.0.15", features = ["derive"] }
+
 [dev-dependencies]
 
 criterion = "0.4.0"

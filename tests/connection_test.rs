@@ -1,3 +1,4 @@
+use anode_kv::config::Config;
 use anode_kv::server::Server;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
@@ -5,7 +6,7 @@ use tokio::time::Duration;
 
 #[tokio::test]
 async fn it_can_accept_connections() {
-    let mut server = Server::create("127.0.0.1:0").await.unwrap();
+    let mut server = Server::create(create_config()).await.unwrap();
     let addr = server.addr();
     tokio::spawn(async move {
         server.run().await;
@@ -17,7 +18,7 @@ async fn it_can_accept_connections() {
 
 #[tokio::test]
 async fn it_can_accept_multiple_connections() {
-    let mut server = Server::create("127.0.0.1:0").await.unwrap();
+    let mut server = Server::create(create_config()).await.unwrap();
     let addr = server.addr();
     tokio::spawn(async move {
         server.run().await;
@@ -57,4 +58,10 @@ async fn connect_and_request(addr: String) -> TcpStream {
     assert_eq!(buffer, expected_response);
 
     stream
+}
+
+fn create_config() -> Config {
+    let mut config = Config::default();
+    config.address = "127.0.0.1:0".to_string();
+    config
 }
