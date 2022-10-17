@@ -4,6 +4,7 @@ use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 
+use crate::config::Config;
 use crate::connection::ConnectionManager;
 use crate::storage::{InMemoryStorage, StorageSendQueue};
 
@@ -23,20 +24,18 @@ pub struct Server {
 #[derive(Clone)]
 pub struct Context {
     pub storage_queue: StorageSendQueue,
+    pub config: Config,
 }
 
 impl Server {
-    pub async fn create(addr: &str) -> std::io::Result<Server> {
-        let listener = TcpListener::bind(addr).await?;
+    pub async fn create(config: Config) -> std::io::Result<Server> {
+        let (tx, rx) = mpsc::channel(config.storage_queue_size);
+        let context = Context::new(tx, config.clone());
+
+        let listener = TcpListener::bind(&config.address).await?;
         let connection_manager = ConnectionManager::default();
 
-        // TODO: do experiments to determine what size channel makes sense.
-        // This should probably be an input parameter so it can be tuned
-        // based on hardware and use cases.
-        let (tx, rx) = mpsc::channel(10);
-
-        let storage = Arc::new(Mutex::new(InMemoryStorage::new(rx)));
-        let context = Context::new(tx);
+        let storage = Arc::new(Mutex::new(InMemoryStorage::new(rx, context.clone())));
 
         Ok(Server {
             listener,
@@ -74,7 +73,10 @@ impl Server {
 }
 
 impl Context {
-    pub fn new(storage_queue: StorageSendQueue) -> Self {
-        Self { storage_queue }
+    pub fn new(storage_queue: StorageSendQueue, config: Config) -> Self {
+        Self {
+            storage_queue,
+            config,
+        }
     }
 }
