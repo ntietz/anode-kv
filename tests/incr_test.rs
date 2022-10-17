@@ -1,10 +1,11 @@
+use anode_kv::config::Config;
 use anode_kv::server::Server;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::time::Duration;
 
 #[tokio::test]
 async fn it_can_incr_and_decr_keys() {
-    let mut server = Server::create("127.0.0.1:0").await.unwrap();
+    let mut server = Server::create(create_config()).await.unwrap();
     let addr = server.addr();
     tokio::spawn(async move {
         server.run().await;
@@ -74,4 +75,10 @@ fn resp_simple(value: &str) -> String {
 
 fn resp_bulk(value: &str) -> String {
     format!("${}\r\n{}\r\n", value.len(), value)
+}
+
+fn create_config() -> Config {
+    let mut config = Config::default();
+    config.address = "127.0.0.1:0".to_string();
+    config
 }
