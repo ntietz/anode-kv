@@ -1,8 +1,10 @@
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Read, Write};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use thiserror::Error;
+use tokio::sync::mpsc;
+use tokio::sync::oneshot;
 
 use crate::config::Config;
 use crate::storage::StorageCommand;
@@ -12,6 +14,47 @@ use crate::types::{Blob, Value};
 pub enum TransactionLogError {
     #[error("unknown reason: {0}")]
     Failed(#[from] std::io::Error),
+}
+
+pub struct TransactionWorker {
+    log: TransactionLog,
+    recv_queue: TransactionRecvQueue,
+}
+
+pub type TransactionRecvQueue = mpsc::Receiver<(
+    Vec<StorageCommand>,
+    oneshot::Sender<Result<(), TransactionLogError>>,
+)>;
+pub type TransactionSendQueue = mpsc::Sender<(
+    Vec<StorageCommand>,
+    oneshot::Sender<Result<(), TransactionLogError>>,
+)>;
+
+impl TransactionWorker {
+    pub fn new(recv_queue: TransactionRecvQueue, config: Config) -> Self {
+        TransactionWorker {
+            recv_queue,
+            log: TransactionLog::new(config).expect("creating transaction log shold not fail"),
+        }
+    }
+
+    pub async fn run(&mut self) {
+        while let Some((cmds, tx)) = self.recv_queue.recv().await {
+            let response = self.handle_transaction(cmds).await;
+
+            if tx.send(response).is_err() {
+                log::debug!("could not return value to requester; presuming they did not want a value returned");
+            }
+        }
+    }
+
+    async fn handle_transaction(
+        &self,
+        cmds: Vec<StorageCommand>,
+    ) -> Result<(), TransactionLogError> {
+        self.log.record_batch(&cmds[..])?;
+        Ok(())
+    }
 }
 
 pub struct TransactionLog {
@@ -39,6 +82,44 @@ impl TransactionLog {
 
     pub fn record(&self, cmd: &StorageCommand) -> Result<(), TransactionLogError> {
         let mut log = self.current_log.lock().unwrap();
+        self.write_to_log(&mut log, cmd)?;
+        Ok(())
+    }
+
+    pub fn record_batch(&self, cmds: &[StorageCommand]) -> Result<(), TransactionLogError> {
+        let mut log = self.current_log.lock().unwrap();
+        for cmd in cmds {
+            self.write_to_log(&mut log, cmd)?;
+        }
+        Ok(())
+    }
+
+    // TODO: compaction.
+    //fn compact(&self) -> Result<(), TransactionLogError>;
+    // TODO: force to disk
+    //fn fsync(&self) -> Result<(), TransactionLogError>;
+
+    pub fn read(&self) -> Result<LogIterator, TransactionLogError> {
+        // acquire the lock for the write log to ensure that there are no writes
+        // while we read the log.
+        let write_lock = self.current_log.lock().unwrap();
+
+        let log_filename = current_log_filename(&self.config.storage_basepath);
+        let read_log = OpenOptions::new().read(true).open(&log_filename)?;
+
+        let reader = BufReader::new(read_log);
+
+        // explicitly drop it so that it isn't released early
+        drop(write_lock);
+
+        Ok(LogIterator { reader })
+    }
+
+    fn write_to_log(
+        &self,
+        log: &mut MutexGuard<File>,
+        cmd: &StorageCommand,
+    ) -> Result<(), TransactionLogError> {
         match cmd {
             StorageCommand::Incr(key) => {
                 log.write_all(b"I")?;
@@ -68,32 +149,7 @@ impl TransactionLog {
             }
             _ => {}
         };
-
         Ok(())
-    }
-
-    // TODO: batch.
-    //fn record_batch(&self, cmd: &[StorageCommand]) -> Result<(), TransactionLogError>;
-    // TODO: compaction.
-    //fn compact(&self) -> Result<(), TransactionLogError>;
-    // TODO: force to disk
-    //fn fsync(&self) -> Result<(), TransactionLogError>;
-
-    pub fn read(&self) -> Result<LogIterator, TransactionLogError> {
-        // acquire the lock for the write log to ensure that there are no writes
-        // while we read the log.
-        let write_lock = self.current_log.lock().unwrap();
-
-        let log_filename = current_log_filename(&self.config.storage_basepath);
-        let read_log = OpenOptions::new().read(true).open(&log_filename)?;
-
-        let reader = BufReader::new(read_log);
-
-        // explicitly drop it so that it isn't released early
-        // TODO: is there a possibility the rust compiler erases this entirely?
-        drop(write_lock);
-
-        Ok(LogIterator { reader })
     }
 }
 
@@ -230,7 +286,7 @@ mod tests {
 
         let log = TransactionLog::new(config.clone()).expect("should create log");
         for cmd in &commands {
-            log.record(&cmd).expect("should record command");
+            log.record(cmd).expect("should record command");
         }
 
         let read_log = TransactionLog::new(config).expect("should create log");
@@ -243,12 +299,12 @@ mod tests {
     /// sets up the tmp dir including cleaning it beforehand, in case it exists.
     fn setup_tmp_dir(dir: &str) {
         cleanup_tmp_dir(dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(dir).unwrap();
     }
 
     /// sets up the tmp dir including cleaning it beforehand, in case it exists.
     fn cleanup_tmp_dir(dir: &str) {
-        match std::fs::remove_dir_all(&dir) {
+        match std::fs::remove_dir_all(dir) {
             Err(_) => println!("yay, it was already cleaned up!"),
             Ok(_) => println!("cleaning up after someone else"),
         }
