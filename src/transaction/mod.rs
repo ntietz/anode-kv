@@ -32,10 +32,10 @@ pub type TransactionSendQueue = mpsc::Sender<(
 
 impl TransactionWorker {
     pub fn new(recv_queue: TransactionRecvQueue, config: Config) -> Self {
-        return TransactionWorker {
+        TransactionWorker {
             recv_queue,
             log: TransactionLog::new(config).expect("creating transaction log shold not fail"),
-        };
+        }
     }
 
     pub async fn run(&mut self) {
@@ -286,7 +286,7 @@ mod tests {
 
         let log = TransactionLog::new(config.clone()).expect("should create log");
         for cmd in &commands {
-            log.record(&cmd).expect("should record command");
+            log.record(cmd).expect("should record command");
         }
 
         let read_log = TransactionLog::new(config).expect("should create log");
@@ -299,12 +299,12 @@ mod tests {
     /// sets up the tmp dir including cleaning it beforehand, in case it exists.
     fn setup_tmp_dir(dir: &str) {
         cleanup_tmp_dir(dir);
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(dir).unwrap();
     }
 
     /// sets up the tmp dir including cleaning it beforehand, in case it exists.
     fn cleanup_tmp_dir(dir: &str) {
-        match std::fs::remove_dir_all(&dir) {
+        match std::fs::remove_dir_all(dir) {
             Err(_) => println!("yay, it was already cleaned up!"),
             Ok(_) => println!("cleaning up after someone else"),
         }
