@@ -1,10 +1,10 @@
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Read, Write};
 use std::sync::{Arc, Mutex, MutexGuard};
-use tokio::sync::mpsc;
-use tokio::sync::oneshot;
 
 use thiserror::Error;
+use tokio::sync::mpsc;
+use tokio::sync::oneshot;
 
 use crate::config::Config;
 use crate::storage::StorageCommand;
@@ -30,13 +30,12 @@ pub type TransactionSendQueue = mpsc::Sender<(
     oneshot::Sender<Result<(), TransactionLogError>>,
 )>;
 
-
 impl TransactionWorker {
     pub fn new(recv_queue: TransactionRecvQueue, config: Config) -> Self {
         return TransactionWorker {
             recv_queue,
             log: TransactionLog::new(config).expect("creating transaction log shold not fail"),
-        }
+        };
     }
 
     pub async fn run(&mut self) {
@@ -49,7 +48,10 @@ impl TransactionWorker {
         }
     }
 
-    async fn handle_transaction(&self, cmds: Vec<StorageCommand>) -> Result<(), TransactionLogError> {
+    async fn handle_transaction(
+        &self,
+        cmds: Vec<StorageCommand>,
+    ) -> Result<(), TransactionLogError> {
         self.log.record_batch(&cmds[..])?;
         Ok(())
     }
@@ -113,7 +115,11 @@ impl TransactionLog {
         Ok(LogIterator { reader })
     }
 
-    fn write_to_log(&self, log: &mut MutexGuard<File>, cmd: &StorageCommand) -> Result<(), TransactionLogError> {
+    fn write_to_log(
+        &self,
+        log: &mut MutexGuard<File>,
+        cmd: &StorageCommand,
+    ) -> Result<(), TransactionLogError> {
         match cmd {
             StorageCommand::Incr(key) => {
                 log.write_all(b"I")?;

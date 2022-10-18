@@ -128,7 +128,10 @@ impl InMemoryStorage {
     async fn record_cmd(&self, cmd: &StorageCommand) -> Result<(), StorageError> {
         if self.durable {
             let (tx, _rx) = oneshot::channel();
-            self.transaction_queue.send((vec![cmd.clone()], tx)).await.expect("sending to transaction log failed");
+            self.transaction_queue
+                .send((vec![cmd.clone()], tx))
+                .await
+                .expect("sending to transaction log failed");
         }
         Ok(())
     }

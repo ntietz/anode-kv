@@ -7,7 +7,7 @@ use tokio::sync::Mutex;
 use crate::config::Config;
 use crate::connection::ConnectionManager;
 use crate::storage::{InMemoryStorage, StorageSendQueue};
-use crate::transaction::{TransactionWorker, TransactionSendQueue};
+use crate::transaction::{TransactionSendQueue, TransactionWorker};
 
 pub struct Server {
     listener: TcpListener,
@@ -91,7 +91,11 @@ impl Server {
 }
 
 impl Context {
-    pub fn new(storage_queue: StorageSendQueue, transaction_queue: TransactionSendQueue, config: Config) -> Self {
+    pub fn new(
+        storage_queue: StorageSendQueue,
+        transaction_queue: TransactionSendQueue,
+        config: Config,
+    ) -> Self {
         Self {
             storage_queue,
             transaction_queue,
