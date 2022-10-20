@@ -156,7 +156,17 @@ impl TransactionLog {
                 log.write_all(&value.0.len().to_le_bytes()[..])?;
                 log.write_all(&value.0[..])?;
             }
-            _ => {}
+            StorageCommand::SetRemove(key, value) => {
+                log.write_all(b"C")?;
+                log.write_all(&key.0.len().to_le_bytes()[..])?;
+                log.write_all(&key.0[..])?;
+                log.write_all(&value.0.len().to_le_bytes()[..])?;
+                log.write_all(&value.0[..])?;
+            }
+            StorageCommand::SetIntersection(_) => {}
+            StorageCommand::SetUnion(_) => {}
+            StorageCommand::Get(_) => {}
+            StorageCommand::SetMembers(_) => {}
         };
         Ok(())
     }
@@ -246,6 +256,18 @@ impl LogIterator {
 
                 Ok(Some(StorageCommand::SetAdd(key, value)))
             }
+            b'C' => {
+                self.reader.read_exact(&mut header[1..])?;
+                let (len_bytes, _) = header[1..].split_at(std::mem::size_of::<usize>());
+                let value_len = usize::from_le_bytes(len_bytes.try_into().unwrap());
+                let mut value_bytes: Vec<u8> = vec![0; value_len];
+                self.reader.read_exact(&mut value_bytes[..])?;
+
+                let value = Blob(value_bytes);
+
+                Ok(Some(StorageCommand::SetRemove(key, value)))
+            }
+
             _ => {
                 // TODO: log the error, this means the log is corrupted.
                 // once this is logged, we can have a setting for whether
