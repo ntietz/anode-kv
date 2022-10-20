@@ -20,3 +20,4 @@ perf.data*
 
 # Test data
 .tmp/
+tmp/
