@@ -15,6 +15,9 @@ pub enum Command {
     Decr(Key),
     Incr(Key),
 
+    SetAdd(Key, Blob),
+    SetMembers(Key),
+
     Unknown(String),
 }
 
@@ -70,6 +73,19 @@ impl Command {
 
                 Ok((Command::Decr(key), length + 1))
             }
+            "SADD" => {
+                validate_length(length, SADD_LENGTH)?;
+                let key = string_token_as_bytes(tokens.get(2))?;
+                let value = string_token_as_bytes(tokens.get(3))?;
+
+                Ok((Command::SetAdd(key, value), length + 1))
+            }
+            "SMEMBERS" => {
+                validate_length(length, SMEMBERS_LENGTH)?;
+                let key = string_token_as_bytes(tokens.get(2))?;
+
+                Ok((Command::SetMembers(key), length + 1))
+            }
             unk => Ok((Command::Unknown(unk.to_string()), length + 1)),
         }
     }
@@ -81,6 +97,8 @@ const GET_LENGTH: usize = 2;
 const SET_LENGTH: usize = 3;
 const INCR_LENGTH: usize = 2;
 const DECR_LENGTH: usize = 2;
+const SADD_LENGTH: usize = 3;
+const SMEMBERS_LENGTH: usize = 2;
 
 fn get_command(tokens: &[Token]) -> Result<(usize, String), CommandError> {
     let length = match tokens.get(0) {

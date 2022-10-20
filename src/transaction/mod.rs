@@ -65,7 +65,6 @@ pub struct TransactionLog {
 impl TransactionLog {
     pub fn new(config: Config) -> Result<Self, TransactionLogError> {
         let log_filename = current_log_filename(&config.storage_basepath);
-        println!("log: {}", log_filename);
         let current_log = OpenOptions::new()
             .create(true)
             .read(true)
@@ -145,7 +144,17 @@ impl TransactionLog {
                         log.write_all(&b.0.len().to_le_bytes()[..])?;
                         log.write_all(&b.0[..])?;
                     }
+                    _ => {
+                        panic!("unexpected value in transaction log; should only be able to SET ints or blobs");
+                    }
                 }
+            }
+            StorageCommand::SetAdd(key, value) => {
+                log.write_all(b"A")?;
+                log.write_all(&key.0.len().to_le_bytes()[..])?;
+                log.write_all(&key.0[..])?;
+                log.write_all(&value.0.len().to_le_bytes()[..])?;
+                log.write_all(&value.0[..])?;
             }
             _ => {}
         };
@@ -226,6 +235,17 @@ impl LogIterator {
                     }
                 }
             }
+            b'A' => {
+                self.reader.read_exact(&mut header[1..])?;
+                let (len_bytes, _) = header[1..].split_at(std::mem::size_of::<usize>());
+                let value_len = usize::from_le_bytes(len_bytes.try_into().unwrap());
+                let mut value_bytes: Vec<u8> = vec![0; value_len];
+                self.reader.read_exact(&mut value_bytes[..])?;
+
+                let value = Blob(value_bytes);
+
+                Ok(Some(StorageCommand::SetAdd(key, value)))
+            }
             _ => {
                 // TODO: log the error, this means the log is corrupted.
                 // once this is logged, we can have a setting for whether
@@ -282,6 +302,7 @@ mod tests {
         let commands = vec![
             StorageCommand::Set("a".into(), "1".bytes().collect::<Vec<u8>>().into()),
             StorageCommand::Incr("a".into()),
+            StorageCommand::SetAdd("x".into(), "z".into()),
         ];
 
         let log = TransactionLog::new(config.clone()).expect("should create log");

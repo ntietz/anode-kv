@@ -98,6 +98,31 @@ impl CommandProcessor {
                 })
                 .await
             }
+            Command::SetAdd(key, blob) => {
+                self.execute_command_helper(
+                    StorageCommand::SetAdd(key.clone(), blob.clone()),
+                    |res| match res {
+                        Ok(Ok(Some(value))) => ExecutionResult(value_to_tokens(value)),
+                        Ok(Ok(None)) => "invalid response from storage".into(),
+                        Ok(Err(err)) => storage_error_to_string(err).into(),
+                        Err(_) => "no response from storage".into(),
+                    },
+                )
+                .await
+            }
+            Command::SetMembers(key) => {
+                self.execute_command_helper(
+                    StorageCommand::SetMembers(key.clone()),
+                    |res| match res {
+                        Ok(Ok(Some(value))) => ExecutionResult(value_to_tokens(value)),
+                        Ok(Ok(None)) => "invalid response from storage".into(),
+                        Ok(Err(err)) => storage_error_to_string(err).into(),
+                        Err(_) => "no response from storage".into(),
+                    },
+                )
+                .await
+            }
+
             Command::Unknown(cmd) => format!("{} is not implemented", cmd).into(),
         }
     }
@@ -131,12 +156,32 @@ fn value_to_tokens(value: Value) -> Vec<Token> {
             let b = i.to_string().into_bytes();
             vec![Blob(b).into()]
         }
+        Value::Set(members) => {
+            let mut reply = Vec::with_capacity(members.len() + 1);
+            reply.push(Token::Array(members.len() as i64));
+            for m in members {
+                reply.push(m.into());
+            }
+            reply
+        }
+        Value::Hash(map) => {
+            let mut reply = Vec::with_capacity(map.len() * 2 + 1);
+            reply.push(Token::Array(map.len() as i64 * 2));
+            for (key, value) in map.iter() {
+                reply.push(key.into());
+                reply.push(value.into());
+            }
+            reply
+        }
     }
 }
 
 fn storage_error_to_string(error: StorageError) -> &'static str {
     match error {
         StorageError::NotAnInteger => {
+            "WRONGTYPE Operation against a key holding the wrong kind of value"
+        }
+        StorageError::NotASet => {
             "WRONGTYPE Operation against a key holding the wrong kind of value"
         }
         StorageError::Overflow => "ERR increment or decrement would overflow",

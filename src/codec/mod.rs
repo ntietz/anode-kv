@@ -21,6 +21,12 @@ impl From<Blob> for Token {
     }
 }
 
+impl From<&Blob> for Token {
+    fn from(b: &Blob) -> Self {
+        Token::BulkString(Some(b.0.clone()))
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum ReadError {
     #[error("not implemented")]
