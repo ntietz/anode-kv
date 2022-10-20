@@ -16,6 +16,9 @@ pub enum Command {
     Incr(Key),
 
     SetAdd(Key, Blob),
+    SetRemove(Key, Blob),
+    SetIntersection(Vec<Key>),
+    SetUnion(Vec<Key>),
     SetMembers(Key),
 
     Unknown(String),
@@ -80,6 +83,31 @@ impl Command {
 
                 Ok((Command::SetAdd(key, value), length + 1))
             }
+            "SREM" => {
+                validate_length(length, SREM_LENGTH)?;
+                let key = string_token_as_bytes(tokens.get(2))?;
+                let value = string_token_as_bytes(tokens.get(3))?;
+
+                Ok((Command::SetRemove(key, value), length + 1))
+            }
+            "SINTER" => {
+                let mut keys = Vec::with_capacity(length - 1);
+                for token in tokens[2..].iter() {
+                    let key = string_token_as_bytes(Some(token))?;
+                    keys.push(key);
+                }
+
+                Ok((Command::SetIntersection(keys), length + 1))
+            }
+            "SUNION" => {
+                let mut keys = Vec::with_capacity(length - 1);
+                for token in tokens[2..].iter() {
+                    let key = string_token_as_bytes(Some(token))?;
+                    keys.push(key);
+                }
+
+                Ok((Command::SetUnion(keys), length + 1))
+            }
             "SMEMBERS" => {
                 validate_length(length, SMEMBERS_LENGTH)?;
                 let key = string_token_as_bytes(tokens.get(2))?;
@@ -98,6 +126,7 @@ const SET_LENGTH: usize = 3;
 const INCR_LENGTH: usize = 2;
 const DECR_LENGTH: usize = 2;
 const SADD_LENGTH: usize = 3;
+const SREM_LENGTH: usize = 3;
 const SMEMBERS_LENGTH: usize = 2;
 
 fn get_command(tokens: &[Token]) -> Result<(usize, String), CommandError> {
