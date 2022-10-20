@@ -1,4 +1,4 @@
-//use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Error, Formatter};
 
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -15,8 +15,8 @@ pub type Key = Blob;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Value {
     Blob(Blob),
-    //Set(HashSet<Blob>),
-    //Hash(HashMap<Blob,Blob>),
+    Set(HashSet<Blob>),
+    Hash(HashMap<Blob, Blob>),
     Int(i64),
 }
 
