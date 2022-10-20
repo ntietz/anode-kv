@@ -110,6 +110,39 @@ impl CommandProcessor {
                 )
                 .await
             }
+            Command::SetRemove(key, blob) => {
+                self.execute_command_helper(
+                    StorageCommand::SetRemove(key.clone(), blob.clone()),
+                    |res| match res {
+                        Ok(Ok(Some(value))) => ExecutionResult(value_to_tokens(value)),
+                        Ok(Ok(None)) => "invalid response from storage".into(),
+                        Ok(Err(err)) => storage_error_to_string(err).into(),
+                        Err(_) => "no response from storage".into(),
+                    },
+                )
+                .await
+            }
+            Command::SetIntersection(keys) => {
+                self.execute_command_helper(StorageCommand::SetIntersection(keys.clone()), |res| {
+                    match res {
+                        Ok(Ok(Some(value))) => ExecutionResult(value_to_tokens(value)),
+                        Ok(Ok(None)) => "invalid response from storage".into(),
+                        Ok(Err(err)) => storage_error_to_string(err).into(),
+                        Err(_) => "no response from storage".into(),
+                    }
+                })
+                .await
+            }
+            Command::SetUnion(keys) => {
+                self.execute_command_helper(StorageCommand::SetUnion(keys.clone()), |res| match res
+                {
+                    Ok(Ok(Some(value))) => ExecutionResult(value_to_tokens(value)),
+                    Ok(Ok(None)) => "invalid response from storage".into(),
+                    Ok(Err(err)) => storage_error_to_string(err).into(),
+                    Err(_) => "no response from storage".into(),
+                })
+                .await
+            }
             Command::SetMembers(key) => {
                 self.execute_command_helper(
                     StorageCommand::SetMembers(key.clone()),

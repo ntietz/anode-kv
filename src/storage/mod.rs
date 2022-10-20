@@ -17,6 +17,9 @@ pub enum StorageCommand {
     Incr(Key),
     Decr(Key),
     SetAdd(Key, Blob),
+    SetRemove(Key, Blob),
+    SetIntersection(Vec<Key>),
+    SetUnion(Vec<Key>),
     SetMembers(Key),
 }
 
@@ -106,6 +109,9 @@ impl InMemoryStorage {
             StorageCommand::Decr(key) => self.handle_add(key, -1).await,
             StorageCommand::SetAdd(key, blob) => self.handle_set_add(key, blob).await,
             StorageCommand::SetMembers(key) => self.handle_set_members(key).await,
+            StorageCommand::SetRemove(key, blob) => self.handle_set_remove(key, blob).await,
+            StorageCommand::SetIntersection(keys) => self.handle_set_intersection(keys).await,
+            StorageCommand::SetUnion(keys) => self.handle_set_union(keys).await,
         }
     }
 
@@ -174,6 +180,66 @@ impl InMemoryStorage {
                 .expect("sending to transaction log failed");
         }
         Ok(())
+    }
+
+    async fn handle_set_remove(
+        &mut self,
+        key: Blob,
+        blob: Blob,
+    ) -> Result<Option<Value>, StorageError> {
+        match self.data.get_mut(&key) {
+            Some(Value::Set(val)) => {
+                let removed = val.remove(&blob);
+                Ok(Some(Value::Int(i64::from(removed))))
+            }
+            Some(_) => Err(StorageError::NotASet),
+            None => Err(StorageError::NotASet),
+        }
+    }
+
+    async fn handle_set_intersection(
+        &self,
+        keys: Vec<Blob>,
+    ) -> Result<Option<Value>, StorageError> {
+        if keys.is_empty() {
+            return Err(StorageError::NotASet);
+        }
+        let mut keys = keys.iter();
+
+        let mut result = self.get_set(keys.next().unwrap())?;
+
+        for key in keys {
+            // this is probably doing way too many clones. a problem for another
+            // day when we deal with lifetimes and RCs and stuff!
+            result = result.intersection(&self.get_set(key)?).cloned().collect();
+        }
+
+        Ok(Some(Value::Set(result)))
+    }
+
+    async fn handle_set_union(&self, keys: Vec<Blob>) -> Result<Option<Value>, StorageError> {
+        if keys.is_empty() {
+            return Err(StorageError::NotASet);
+        }
+        let mut keys = keys.iter();
+
+        let mut result = self.get_set(keys.next().unwrap())?;
+
+        for key in keys {
+            // this is probably doing way too many clones. a problem for another
+            // day when we deal with lifetimes and RCs and stuff!
+            result = result.union(&self.get_set(key)?).cloned().collect();
+        }
+
+        Ok(Some(Value::Set(result)))
+    }
+
+    fn get_set(&self, key: &Blob) -> Result<HashSet<Blob>, StorageError> {
+        if let Some(Value::Set(s)) = self.data.get(key) {
+            Ok(s.clone())
+        } else {
+            Err(StorageError::NotASet)
+        }
     }
 }
 
