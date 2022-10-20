@@ -19,7 +19,7 @@ pub struct Config {
     pub storage_basepath: String,
 
     // Reconstruct the database from the log
-    #[arg(short, long, default_value_t = false)]
+    #[arg(short, long, default_value_t = true)]
     pub read_log: bool,
 
     // Size channel for sending transactions to the transaction worker

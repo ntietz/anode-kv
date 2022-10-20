@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use thiserror::Error;
 use tokio::sync::mpsc;
@@ -16,6 +16,8 @@ pub enum StorageCommand {
     Get(Key),
     Incr(Key),
     Decr(Key),
+    SetAdd(Key, Blob),
+    SetMembers(Key),
 }
 
 #[derive(Error, Debug)]
@@ -25,6 +27,9 @@ pub enum StorageError {
 
     #[error("not an integer")]
     NotAnInteger,
+
+    #[error("not a set")]
+    NotASet,
 
     #[error("transaction log error: {0}")]
     LogError(#[from] TransactionLogError),
@@ -69,7 +74,9 @@ impl InMemoryStorage {
 
         let log = TransactionLog::new(config).expect("should be able to read from the log");
         for cmd in log.read().unwrap() {
-            self.handle_cmd(cmd).await.expect("should work");
+            if let Err(e) = self.handle_cmd(cmd).await {
+                log::error!("error while replaying command: {}", e);
+            };
             count += 1;
         }
 
@@ -97,11 +104,13 @@ impl InMemoryStorage {
             StorageCommand::Get(key) => Ok(self.data.get(&key).cloned()),
             StorageCommand::Incr(key) => self.handle_add(key, 1).await,
             StorageCommand::Decr(key) => self.handle_add(key, -1).await,
+            StorageCommand::SetAdd(key, blob) => self.handle_set_add(key, blob).await,
+            StorageCommand::SetMembers(key) => self.handle_set_members(key).await,
         }
     }
 
     async fn handle_add(&mut self, key: Key, amount: i64) -> Result<Option<Value>, StorageError> {
-        let entry = self.data.entry(key).or_insert(Value::Int(0));
+        let entry = self.data.entry(key).or_insert_with(|| Value::Int(0));
         match entry {
             Value::Int(i) => {
                 *i = safe_add(*i, amount)?;
@@ -114,6 +123,37 @@ impl InMemoryStorage {
                     Ok(Some(entry.clone()))
                 }
             },
+            Value::Set(_) => Err(StorageError::NotAnInteger),
+            Value::Hash(_) => Err(StorageError::NotAnInteger),
+        }
+    }
+
+    async fn handle_set_add(
+        &mut self,
+        key: Key,
+        value: Blob,
+    ) -> Result<Option<Value>, StorageError> {
+        let entry = self
+            .data
+            .entry(key)
+            .or_insert_with(|| Value::Set(HashSet::new()));
+        match entry {
+            Value::Set(set) => {
+                let added = set.insert(value);
+                Ok(Some(Value::Int(i64::from(added))))
+            }
+            _ => Err(StorageError::NotASet),
+        }
+    }
+
+    async fn handle_set_members(&mut self, key: Key) -> Result<Option<Value>, StorageError> {
+        let entry = self
+            .data
+            .entry(key)
+            .or_insert_with(|| Value::Set(HashSet::new()));
+        match entry {
+            val @ Value::Set(_) => Ok(Some(val.clone())),
+            _ => Err(StorageError::NotASet),
         }
     }
 
