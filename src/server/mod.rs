@@ -4,13 +4,16 @@ use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 
+use crate::config::Config;
 use crate::connection::ConnectionManager;
 use crate::storage::{InMemoryStorage, StorageSendQueue};
+use crate::transaction::{TransactionSendQueue, TransactionWorker};
 
 pub struct Server {
     listener: TcpListener,
     connection_manager: ConnectionManager,
     storage: Arc<Mutex<InMemoryStorage>>,
+    transaction_worker: Arc<Mutex<TransactionWorker>>,
     context: Context,
 }
 
@@ -23,26 +26,34 @@ pub struct Server {
 #[derive(Clone)]
 pub struct Context {
     pub storage_queue: StorageSendQueue,
+    pub transaction_queue: TransactionSendQueue,
+    pub config: Config,
 }
 
 impl Server {
-    pub async fn create(addr: &str) -> std::io::Result<Server> {
-        let listener = TcpListener::bind(addr).await?;
+    pub async fn create(config: Config) -> std::io::Result<Server> {
+        let (tx, rx) = mpsc::channel(config.storage_queue_size);
+        let (ttx, trx) = mpsc::channel(config.transaction_queue_size);
+        let context = Context::new(tx, ttx, config.clone());
+
+        let listener = TcpListener::bind(&config.address).await?;
         let connection_manager = ConnectionManager::default();
 
-        // TODO: do experiments to determine what size channel makes sense.
-        // This should probably be an input parameter so it can be tuned
-        // based on hardware and use cases.
-        let (tx, rx) = mpsc::channel(10);
+        let mut storage_impl = InMemoryStorage::new(rx, context.clone());
+        if config.read_log {
+            storage_impl.load_from_log(config.clone()).await;
+        }
+        let storage = Arc::new(Mutex::new(storage_impl));
 
-        let storage = Arc::new(Mutex::new(InMemoryStorage::new(rx)));
-        let context = Context::new(tx);
+        let transaction_impl = TransactionWorker::new(trx, config.clone());
+        let transaction_worker = Arc::new(Mutex::new(transaction_impl));
 
         Ok(Server {
             listener,
             connection_manager,
             storage,
             context,
+            transaction_worker,
         })
     }
 
@@ -51,6 +62,12 @@ impl Server {
         let _storage_handle = tokio::spawn(async move {
             let mut storage = storage.lock().await;
             storage.run().await;
+        });
+
+        let transaction_worker = self.transaction_worker.clone();
+        let _transaction_worker_handle = tokio::spawn(async move {
+            let mut transaction_worker = transaction_worker.lock().await;
+            transaction_worker.run().await;
         });
 
         loop {
@@ -74,7 +91,15 @@ impl Server {
 }
 
 impl Context {
-    pub fn new(storage_queue: StorageSendQueue) -> Self {
-        Self { storage_queue }
+    pub fn new(
+        storage_queue: StorageSendQueue,
+        transaction_queue: TransactionSendQueue,
+        config: Config,
+    ) -> Self {
+        Self {
+            storage_queue,
+            transaction_queue,
+            config,
+        }
     }
 }

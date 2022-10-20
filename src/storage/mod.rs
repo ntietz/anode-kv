@@ -4,7 +4,10 @@ use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
-pub use crate::transaction::{TransactionLog, TransactionLogError};
+use crate::config::Config;
+use crate::server::Context;
+use crate::transaction::TransactionLog;
+pub use crate::transaction::{TransactionLogError, TransactionSendQueue};
 use crate::types::{Blob, Key, Value};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -33,7 +36,7 @@ pub enum StorageError {
 pub struct InMemoryStorage {
     data: HashMap<Key, Value>,
     recv_queue: StorageRecvQueue,
-    log: TransactionLog,
+    transaction_queue: TransactionSendQueue,
     durable: bool,
 }
 
@@ -47,33 +50,31 @@ pub type StorageSendQueue = mpsc::Sender<(
 )>;
 
 impl InMemoryStorage {
-    pub fn new(recv_queue: StorageRecvQueue) -> Self {
+    pub fn new(recv_queue: StorageRecvQueue, context: Context) -> Self {
         let data = HashMap::new();
-        // TODO: pass this in instead
-        let log = TransactionLog::new("log").expect("creating transaction log shold not fail");
+        let durable = true;
 
         Self {
             data,
             recv_queue,
-            log,
-            durable: true,
+            transaction_queue: context.transaction_queue,
+            durable,
         }
     }
 
-    pub async fn from_log(recv_queue: StorageRecvQueue) -> Self {
-        let mut store = Self::new(recv_queue);
-
+    pub async fn load_from_log(&mut self, config: Config) {
         println!("starting log read");
-        store.disable_durability();
+        self.disable_durability();
         let mut count: usize = 0;
-        for cmd in store.log.read().unwrap() {
-            store.handle_cmd(cmd).await.expect("should work");
+
+        let log = TransactionLog::new(config).expect("should be able to read from the log");
+        for cmd in log.read().unwrap() {
+            self.handle_cmd(cmd).await.expect("should work");
             count += 1;
         }
-        store.enable_durability();
-        println!("finished log read; {} records", count);
 
-        store
+        self.enable_durability();
+        println!("finished log read; {} records", count);
     }
 
     pub async fn run(&mut self) {
@@ -87,7 +88,7 @@ impl InMemoryStorage {
     }
 
     pub async fn handle_cmd(&mut self, cmd: StorageCommand) -> Result<Option<Value>, StorageError> {
-        self.record_cmd(&cmd)?;
+        self.record_cmd(&cmd).await?;
         match cmd {
             StorageCommand::Set(key, value) => {
                 self.data.insert(key, value);
@@ -124,14 +125,13 @@ impl InMemoryStorage {
         self.durable = false;
     }
 
-    fn record_cmd(&self, cmd: &StorageCommand) -> Result<(), StorageError> {
+    async fn record_cmd(&self, cmd: &StorageCommand) -> Result<(), StorageError> {
         if self.durable {
-            match cmd {
-                StorageCommand::Get(_) => {}
-                _ => {
-                    self.log.record(cmd)?;
-                }
-            };
+            let (tx, _rx) = oneshot::channel();
+            self.transaction_queue
+                .send((vec![cmd.clone()], tx))
+                .await
+                .expect("sending to transaction log failed");
         }
         Ok(())
     }
