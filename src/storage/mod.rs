@@ -78,7 +78,7 @@ impl InMemoryStorage {
         let log = TransactionLog::new(config).expect("should be able to read from the log");
         for cmd in log.read().unwrap() {
             if let Err(e) = self.handle_cmd(cmd).await {
-                log::error!("error while replaying command: {}", e);
+                tracing::error!(e=?e, "error while replaying command");
             };
             count += 1;
         }
@@ -92,11 +92,12 @@ impl InMemoryStorage {
             let response = self.handle_cmd(cmd).await;
 
             if tx.send(response).is_err() {
-                log::error!("could not return value to requester; early disconnection?");
+                tracing::error!("could not return value to requester; early disconnection?");
             }
         }
     }
 
+    #[tracing::instrument(skip(self), level = "trace")]
     pub async fn handle_cmd(&mut self, cmd: StorageCommand) -> Result<Option<Value>, StorageError> {
         self.record_cmd(&cmd).await?;
         match cmd {

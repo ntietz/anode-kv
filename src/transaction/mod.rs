@@ -43,7 +43,7 @@ impl TransactionWorker {
             let response = self.handle_transaction(cmds).await;
 
             if tx.send(response).is_err() {
-                log::debug!("could not return value to requester; presuming they did not want a value returned");
+                tracing::debug!("could not return value to requester; presuming they did not want a value returned");
             }
         }
     }
@@ -114,6 +114,7 @@ impl TransactionLog {
         Ok(LogIterator { reader })
     }
 
+    #[tracing::instrument(skip(self, log), level = "trace")]
     fn write_to_log(
         &self,
         log: &mut MutexGuard<File>,

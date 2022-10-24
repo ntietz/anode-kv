@@ -78,7 +78,7 @@ impl Server {
                         .await;
                 }
                 Err(e) => {
-                    log::error!("error accepting connection: {}", e);
+                    tracing::error!(e=?e, "error accepting connection");
                 }
             }
         }

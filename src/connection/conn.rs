@@ -29,7 +29,7 @@ impl Connection {
     }
 
     pub async fn handle(&mut self) -> std::io::Result<()> {
-        log::info!("(id={}) accepting connection from {}", self.id, self.addr);
+        tracing::debug!("(id={}) accepting connection from {}", self.id, self.addr);
 
         let mut buffer = BytesMut::with_capacity(4 * 1024);
         let cp = CommandProcessor::new(self.context.clone());
