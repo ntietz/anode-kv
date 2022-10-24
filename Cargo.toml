@@ -23,6 +23,10 @@ thiserror = "1.0.35"
 log = "0.4.17"
 env_logger = "0.9.1"
 
+# sometimes we want to trace
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "std"] }
+
 # starting this out async
 # - enable "full" to get all the things, TODO slim this down later!
 # - enable "tracing" to support use of tokio-console

@@ -37,18 +37,22 @@ impl ConnectionManager {
         let id = self.latest_id.fetch_add(1, Ordering::SeqCst);
 
         let mut connection = Connection::new(context, id, socket, addr);
-        log::info!("accepted new connection. id={}, addr={}", id, addr);
+        let span = tracing::debug_span!("ConnectionManager::take_connection:1", id=id, addr=?addr);
+        let _guard = span.enter();
 
         let tracker = self.tracker.clone();
 
         let handle = tokio::spawn(async move {
+            let span = tracing::debug_span!("ConnectionManager::take_connection::handle", id=id, addr=?addr);
+            let _guard = span.enter();
+
             match connection.handle().await {
                 Ok(()) => {
-                    log::info!("connection {}: terminated gracefully", id);
+                    tracing::info!(id, "connection terminated gracefully");
                     tracker.lock().unwrap().remove(id);
                 }
                 Err(e) => {
-                    log::error!("connection {}: error {}", id, e);
+                    tracing::error!(id, e=?e, "connection ended with error");
                     tracker.lock().unwrap().remove(id);
                 }
             };
