@@ -19,10 +19,6 @@ atoi = "1.0.0"
 # error tracking is cool
 thiserror = "1.0.35"
 
-# i like loggers, i hate lagers
-log = "0.4.17"
-env_logger = "0.9.1"
-
 # sometimes we want to trace
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "std"] }
